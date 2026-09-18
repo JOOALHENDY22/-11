@@ -6,12 +6,15 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Dependencies
+# Dependencies & Builds
 node_modules
-server/node_modules
+**/node_modules
 dist
+**/dist
 dist-ssr
-server/dist
+**/dist-ssr
+.vite
+**/.vite
 *.local
 
 # Editor & AI Tool Directories
