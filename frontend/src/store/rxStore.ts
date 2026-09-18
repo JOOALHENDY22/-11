@@ -13,6 +13,7 @@ import {
 } from '../types';
 import { runClinicalSafetyCheck } from '../utils/safetyEngine';
 import { supabaseService } from '../services/supabase';
+import { generatePrescriptionUrl } from '../utils/security';
 
 const STORAGE_KEYS = {
   CURRENT_USER: 'saferx_current_user',
@@ -261,14 +262,7 @@ class RxStore {
       id: `rx-${Date.now()}`,
       rxCode,
       securityPin,
-      qrCodeData: JSON.stringify({
-        code: rxCode,
-        pin: securityPin,
-        pat: data.patientName,
-        doc: doctorName,
-        date: new Date().toISOString().split('T')[0],
-        v: '1.0'
-      }),
+      qrCodeData: generatePrescriptionUrl(rxCode, securityPin),
       doctorId: this.currentUser?.id || `doc-${Date.now()}`,
       doctorName,
       doctorSpecialty,

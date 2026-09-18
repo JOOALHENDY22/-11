@@ -45,7 +45,7 @@ import {
 } from 'lucide-react';
 import { AuthService, UserSession } from './services/authService';
 import { PrescriptionService } from './services/prescriptionService';
-import { SecurityRateLimiter, sanitizeInput, sanitizeAlphaNumeric } from './utils/security';
+import { SecurityRateLimiter, sanitizeInput, sanitizeAlphaNumeric, generatePrescriptionUrl, verifyQRData } from './utils/security';
 import { translations, Language } from './utils/translations';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 
@@ -302,13 +302,7 @@ export const App: React.FC = () => {
             id: d.id,
             rxCode: d.rx_code,
             securityPin: d.security_pin || '1234',
-            qrCodeData: JSON.stringify({
-              code: d.rx_code,
-              pin: d.security_pin,
-              pat: d.patient_name,
-              doc: d.doctor_name,
-              date: d.created_at
-            }),
+            qrCodeData: generatePrescriptionUrl(d.rx_code, d.security_pin),
             doctorName: d.doctor_name || 'د. الطبيب المعالج',
             doctorEmail: d.doctor_email || '',
             doctorSpecialty: d.doctor_specialty || 'طبيب استشاري',
@@ -344,6 +338,90 @@ export const App: React.FC = () => {
 
     fetchRemotePrescriptions();
   }, []);
+
+  // Automatically detect and open scanned Prescription QR Codes from URL (?rx=RX-CODE or ?code=RX-CODE or #rx=...)
+  useEffect(() => {
+    const handleUrlPrescriptionScan = async () => {
+      try {
+        const searchParams = new URLSearchParams(window.location.search);
+        const hash = window.location.hash || '';
+        const hashMatch = hash.match(/[?&#](?:rx|code)=([^&#]+)/i);
+        const hashParam = hashMatch ? decodeURIComponent(hashMatch[1]) : null;
+
+        const rawParam = searchParams.get('rx') || searchParams.get('code') || hashParam;
+        if (!rawParam) return;
+
+        const clean = sanitizeAlphaNumeric(rawParam);
+        if (!clean) return;
+
+        // 1. Check in existing loaded prescriptions state
+        let found = prescriptions.find(p => p.rxCode.toUpperCase() === clean);
+
+        // 2. Check in local storage
+        if (!found) {
+          const stored = PrescriptionService.getStoredPrescriptions();
+          found = stored.find(p => p.rxCode.toUpperCase() === clean);
+        }
+
+        // 3. Check in Supabase if online
+        if (!found && supabaseClient) {
+          try {
+            const { data, error } = await supabaseClient
+              .from('prescriptions')
+              .select('*')
+              .ilike('rx_code', clean)
+              .maybeSingle();
+
+            if (!error && data) {
+              found = {
+                id: data.id,
+                rxCode: data.rx_code,
+                securityPin: data.security_pin || '1234',
+                qrCodeData: generatePrescriptionUrl(data.rx_code, data.security_pin),
+                doctorName: data.doctor_name || 'د. الطبيب المعالج',
+                doctorEmail: data.doctor_email || '',
+                doctorSpecialty: data.doctor_specialty || 'طبيب استشاري',
+                patientName: data.patient_name || 'مريض',
+                patientNationalId: data.patient_national_id || '',
+                patientDob: data.patient_dob || '',
+                patientAllergies: data.patient_allergies || [],
+                patientConditions: data.patient_conditions || [],
+                diagnosis: data.diagnosis || '',
+                clinicalNotes: data.clinical_notes || '',
+                vitals: data.vitals || {},
+                medications: data.medications || [],
+                status: data.status || 'active',
+                createdAt: data.created_at || new Date().toISOString(),
+                dispensedAt: data.dispensed_at,
+                dispensedByPharmacistName: data.dispensed_by_pharmacist_name,
+                dispensingBatchNumber: data.dispensing_batch_number
+              };
+              setPrescriptions(prev => {
+                if (prev.some(p => p.rxCode === found!.rxCode)) return prev;
+                return [found!, ...prev];
+              });
+            }
+          } catch (e) {
+            console.warn('[QR Scan URL Fetch]', e);
+          }
+        }
+
+        if (found) {
+          setSelectedRxDetails(found);
+        }
+      } catch (err) {
+        console.warn('[handleUrlPrescriptionScan]', err);
+      }
+    };
+
+    handleUrlPrescriptionScan();
+    window.addEventListener('popstate', handleUrlPrescriptionScan);
+    window.addEventListener('hashchange', handleUrlPrescriptionScan);
+    return () => {
+      window.removeEventListener('popstate', handleUrlPrescriptionScan);
+      window.removeEventListener('hashchange', handleUrlPrescriptionScan);
+    };
+  }, [prescriptions]);
 
   // --- ACTIONS ---
   const handleLogin = async (user: UserSession) => {
@@ -1144,7 +1222,12 @@ const PharmacistStation: React.FC<{
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    const clean = sanitizeAlphaNumeric(rxCodeInput);
+    const raw = (rxCodeInput || '').trim();
+    const verified = verifyQRData(raw);
+    const clean = verified.valid && verified.data?.code 
+      ? verified.data.code 
+      : sanitizeAlphaNumeric(raw);
+
     if (!clean) {
       setErrorMessage(t.pharmaErrorEnterCode);
       return;
@@ -1323,7 +1406,12 @@ const PatientStation: React.FC<{
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    const clean = sanitizeAlphaNumeric(rxCodeInput);
+    const raw = (rxCodeInput || '').trim();
+    const verified = verifyQRData(raw);
+    const clean = verified.valid && verified.data?.code 
+      ? verified.data.code 
+      : sanitizeAlphaNumeric(raw);
+
     if (!clean) {
       setErrorMessage(t.pharmaErrorEnterCode);
       return;
@@ -2103,7 +2191,7 @@ const SuccessRxModalComponent: React.FC<{
 };
 
 // ==========================================
-// 10. RX DETAILS MODAL
+// 10. RX DETAILS MODAL (FULL DIGITAL PRESCRIPTION VIEW)
 // ==========================================
 const RxDetailsModalComponent: React.FC<{
   prescription: Prescription;
@@ -2113,54 +2201,156 @@ const RxDetailsModalComponent: React.FC<{
   language: Language;
 }> = ({ prescription, isOpen, onClose, isDarkMode, language }) => {
   const t = translations[language];
+  const [copiedLink, setCopiedLink] = useState(false);
+
   if (!isOpen) return null;
 
+  const handleCopyLink = () => {
+    const directUrl = prescription.qrCodeData.startsWith('http')
+      ? prescription.qrCodeData
+      : `${window.location.origin}/?rx=${encodeURIComponent(prescription.rxCode)}`;
+    navigator.clipboard.writeText(directUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  const getTimingLabel = (timing: string) => {
+    switch (timing) {
+      case 'after_meal': return t.timingAfterMeal || (language === 'ar' ? 'بعد الأكل' : 'After meal');
+      case 'before_meal': return t.timingBeforeMeal || (language === 'ar' ? 'قبل الأكل' : 'Before meal');
+      case 'with_meal': return t.timingWithMeal || (language === 'ar' ? 'مع الأكل' : 'With meal');
+      case 'bedtime': return t.timingBedtime || (language === 'ar' ? 'عند النوم' : 'At bedtime');
+      default: return t.timingDefault || (language === 'ar' ? 'حسب الإرشادات' : 'As directed');
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-fade-in text-start overflow-y-auto">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-100 dark:border-slate-800 space-y-6 my-8 animate-slide-up">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-2">
-            <span className="font-mono font-bold text-xl text-teal-700 dark:text-teal-400">{prescription.rxCode}</span>
-            <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold ${
-              prescription.status === 'dispensed' 
-                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20' 
-                : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20'
-            }`}>
-              {prescription.status === 'dispensed' ? t.statusDispensed : t.statusActive}
-            </span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in text-start overflow-y-auto">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl p-5 sm:p-8 shadow-2xl border border-slate-100 dark:border-slate-800 space-y-6 my-auto animate-slide-up max-h-[92vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-teal-500/10 text-teal-700 dark:text-teal-300 flex items-center justify-center shadow-xs">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-black text-lg sm:text-xl text-slate-900 dark:text-white">
+                  {prescription.rxCode}
+                </span>
+                <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold border ${
+                  prescription.status === 'dispensed' 
+                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20' 
+                    : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20'
+                }`}>
+                  {prescription.status === 'dispensed' ? t.statusDispensed : t.statusActive}
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-400 font-normal block">
+                {language === 'ar' ? 'روشتة طبية رقمية معتمدة وموثقة' : 'Verified Digital Healthcare Prescription'}
+              </span>
+            </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800">
+          <button 
+            onClick={onClose} 
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 text-xs">
-          <div><strong className="text-slate-400 font-semibold">{t.detailsPatient} </strong><span className="text-slate-900 dark:text-white font-bold">{prescription.patientName}</span></div>
-          <div><strong className="text-slate-400 font-semibold">{t.detailsDoctor} </strong><span className="text-slate-900 dark:text-white font-bold">{prescription.doctorName}</span></div>
-          <div><strong className="text-slate-400 font-semibold">{t.detailsDiagnosis} </strong><span className="text-slate-900 dark:text-white font-bold">{prescription.diagnosis || t.diagnosisFallback}</span></div>
-          <div><strong className="text-slate-400 font-semibold">{t.detailsDate} </strong><span className="text-slate-900 dark:text-white font-mono">{prescription.createdAt.split('T')[0]}</span></div>
-        </div>
-
-        <div className="space-y-2">
-          <h4 className="text-xs font-bold text-slate-900 dark:text-white">{t.detailsMedsTitle}</h4>
-          {prescription.medications.map((m, i) => (
-            <div key={i} className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs flex justify-between items-center">
-              <div>
-                <span className="font-bold block text-slate-900 dark:text-white">{m.name}</span>
-                <span className="text-slate-500 dark:text-slate-400 text-[11px] font-normal">{m.dosage} • {m.frequency} • {m.duration}</span>
-              </div>
-              <span className="font-semibold text-teal-800 dark:text-teal-300 px-2.5 py-1 rounded-lg bg-teal-500/10">
-                {m.quantity} {t.pharmaPackCount}
+        {/* QR Code Presentation Box & Link Sharer */}
+        <div className="flex flex-col sm:flex-row items-center gap-5 p-4 sm:p-5 rounded-2xl bg-teal-500/10 dark:bg-teal-950/30 border border-teal-500/20">
+          <div className="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-xs shrink-0">
+            <QRCodeSVG value={prescription.qrCodeData} size={110} />
+          </div>
+          <div className="space-y-2 text-center sm:text-start flex-1">
+            <div className="flex items-center justify-center sm:justify-start gap-2">
+              <span className="text-xs font-bold text-teal-900 dark:text-teal-300">
+                {language === 'ar' ? 'امسح الكود بالهاتف أو الصيدلية' : 'Scan via Mobile or Pharmacy Reader'}
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 font-mono text-[11px] font-bold text-slate-700 dark:text-slate-300 border border-teal-500/20">
+                PIN: {prescription.securityPin}
               </span>
             </div>
-          ))}
+            <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
+              {language === 'ar' 
+                ? 'يمكنك مسح كود الـ QR بكاميرا الهاتف لفتح الروشتة في أي وقت، أو مشاركة الرابط المباشر مع المريض.'
+                : 'Scan this QR code with any mobile camera to view full prescription details, or share direct link.'}
+            </p>
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs inline-flex items-center gap-1.5 shadow-xs transition-colors"
+              >
+                {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedLink ? (language === 'ar' ? 'تم نسخ رابط الروشتة!' : 'Prescription Link Copied!') : (language === 'ar' ? 'نسخ رابط الروشتة' : 'Copy Direct Link')}</span>
+              </button>
+            </div>
+          </div>
         </div>
 
+        {/* Patient & Doctor Meta Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 text-xs border border-slate-200/70 dark:border-slate-700">
+          <div><strong className="text-slate-400 font-semibold">{t.detailsPatient}: </strong><span className="text-slate-900 dark:text-white font-bold">{prescription.patientName}</span></div>
+          <div><strong className="text-slate-400 font-semibold">{t.detailsDoctor}: </strong><span className="text-slate-900 dark:text-white font-bold">{prescription.doctorName}</span></div>
+          <div><strong className="text-slate-400 font-semibold">{t.detailsDiagnosis}: </strong><span className="text-slate-900 dark:text-white font-bold">{prescription.diagnosis || t.diagnosisFallback}</span></div>
+          <div><strong className="text-slate-400 font-semibold">{t.detailsDate}: </strong><span className="text-slate-900 dark:text-white font-mono">{prescription.createdAt.split('T')[0]}</span></div>
+          {prescription.patientAllergies && prescription.patientAllergies.length > 0 && (
+            <div className="sm:col-span-2 text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              <span>{t.allergyLabel} {prescription.patientAllergies.join(', ')}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Medications list */}
+        <div className="space-y-2.5">
+          <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+            <Pill className="w-3.5 h-3.5 text-teal-600" />
+            <span>{t.detailsMedsTitle}</span>
+          </h4>
+          <div className="space-y-2">
+            {prescription.medications.map((m, i) => (
+              <div key={i} className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <span className="font-bold block text-sm text-slate-900 dark:text-white">{m.name}</span>
+                  <span className="text-slate-500 dark:text-slate-400 text-[11px] font-normal">{m.dosage} • {m.frequency} • {m.duration}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-1 rounded-lg bg-teal-500/10 text-teal-800 dark:text-teal-300 font-semibold text-xs">
+                    {getTimingLabel(m.timing)}
+                  </span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-lg bg-slate-200/70 dark:bg-slate-700 text-xs">
+                    {m.quantity} {t.pharmaPackCount}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Clinical notes if present */}
+        {prescription.clinicalNotes && (
+          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300">
+            <strong className="text-slate-400 font-semibold block mb-1">{language === 'ar' ? 'ملاحظات الطبيب:' : 'Clinical Notes:'}</strong>
+            <p className="leading-relaxed font-normal">{prescription.clinicalNotes}</p>
+          </div>
+        )}
+
+        {/* Footer Actions */}
         <div className="flex justify-between items-center pt-3 border-t border-slate-100 dark:border-slate-800">
-          <button onClick={onClose} className="px-5 py-2.5 rounded-2xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <button 
+            onClick={onClose} 
+            className="px-5 py-2.5 rounded-2xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
             {t.detailsBtnClose}
           </button>
-          <button onClick={() => window.print()} className="px-5 py-2.5 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-colors">
+          <button 
+            onClick={() => window.print()} 
+            className="px-5 py-2.5 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-colors"
+          >
             <Printer className="w-4 h-4" />
             <span>{t.detailsBtnPrint}</span>
           </button>

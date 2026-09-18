@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Prescription, User, UserRole } from '../types';
+import { generatePrescriptionUrl } from '../utils/security';
 
 const metaEnv = (import.meta as any).env || {};
 const DEFAULT_URL = (metaEnv.VITE_SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '').trim();
@@ -167,14 +168,7 @@ class SupabaseService {
             id: data.id || `rx-${Date.now()}`,
             rxCode: data.rx_code,
             securityPin: data.security_pin || '1234',
-            qrCodeData: JSON.stringify({
-              code: data.rx_code,
-              pin: data.security_pin,
-              pat: data.patient_name,
-              doc: data.doctor_name,
-              date: data.created_at,
-              v: '1.0'
-            }),
+            qrCodeData: generatePrescriptionUrl(data.rx_code, data.security_pin),
             doctorId: data.doctor_id || 'doc-1',
             doctorName: data.doctor_name,
             doctorSpecialty: data.doctor_specialty || 'طبيب استشاري',

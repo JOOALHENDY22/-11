@@ -117,41 +117,83 @@ export const SecurityRateLimiter = {
 };
 
 /**
- * 4. QR Code & Digital Signature Checksum
- * Generates an encrypted/integrity-checksummed QR payload to prevent tampering.
+ * 4. QR Code & Digital Direct URL Generation
+ * Generates an actionable, direct web URL that mobile phone cameras and QR scanners can open directly.
  */
+export function generatePrescriptionUrl(code: string, pin?: string): string {
+  let origin = 'https://saferx-health.vercel.app';
+  if (typeof window !== 'undefined' && window.location && window.location.origin) {
+    origin = window.location.origin;
+  }
+  const cleanCode = encodeURIComponent((code || '').trim().toUpperCase());
+  const cleanPin = pin ? `&pin=${encodeURIComponent(pin.trim())}` : '';
+  return `${origin}/?rx=${cleanCode}${cleanPin}`;
+}
+
 export function generateSecureQRPayload(rx: {
   code: string;
   pin: string;
-  pat: string;
-  doc: string;
-  date: string;
+  pat?: string;
+  doc?: string;
+  date?: string;
 }): string {
-  const payloadString = `${rx.code}|${rx.pin}|${rx.pat}|${rx.doc}|${rx.date}`;
-  
-  // Calculate integrity checksum
-  let checksum = 0;
-  for (let i = 0; i < payloadString.length; i++) {
-    checksum = (checksum * 31 + payloadString.charCodeAt(i)) & 0xFFFFFFFF;
-  }
-  const hexChecksum = Math.abs(checksum).toString(16).padStart(8, '0');
-
-  return JSON.stringify({
-    ...rx,
-    sig: hexChecksum,
-    v: '2.0'
-  });
+  return generatePrescriptionUrl(rx.code, rx.pin);
 }
 
 /**
- * 5. Verify QR Code Integrity
+ * 5. Verify QR Code Integrity & Parse QR Payloads (URL, JSON, or Plain Code)
  */
 export function verifyQRData(qrString: string): { valid: boolean; data?: any } {
+  if (!qrString || typeof qrString !== 'string') return { valid: false };
+  const trimmed = qrString.trim();
+
+  // 1. Check for URL format (?rx=... or ?code=...)
   try {
-    const parsed = JSON.parse(qrString);
-    if (!parsed.code) return { valid: false };
-    return { valid: true, data: parsed };
-  } catch {
-    return { valid: false };
+    if (trimmed.includes('rx=') || trimmed.includes('code=')) {
+      const urlObj = trimmed.startsWith('http') 
+        ? new URL(trimmed) 
+        : new URL(`http://localhost/${trimmed.startsWith('?') ? trimmed : '?' + trimmed}`);
+      const rxCode = urlObj.searchParams.get('rx') || urlObj.searchParams.get('code');
+      const pin = urlObj.searchParams.get('pin');
+      if (rxCode) {
+        return {
+          valid: true,
+          data: {
+            code: rxCode.toUpperCase(),
+            pin: pin || '',
+            url: trimmed
+          }
+        };
+      }
+    }
+  } catch (e) {
+    // Ignore URL parse error and proceed to JSON parsing
   }
+
+  // 2. Check for JSON format
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed && (parsed.code || parsed.rxCode)) {
+      return { 
+        valid: true, 
+        data: {
+          code: (parsed.code || parsed.rxCode).toUpperCase(),
+          pin: parsed.pin || parsed.securityPin || '',
+          ...parsed
+        }
+      };
+    }
+  } catch {
+    // 3. Fallback for plain RX code strings (e.g. "RX-8841-K92")
+    if (/^RX-[A-Z0-9]+-[A-Z0-9]+/i.test(trimmed)) {
+      return {
+        valid: true,
+        data: {
+          code: trimmed.toUpperCase()
+        }
+      };
+    }
+  }
+
+  return { valid: false };
 }

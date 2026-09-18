@@ -99,14 +99,7 @@ export const INITIAL_PRESCRIPTIONS: Prescription[] = [
     id: 'rx-seed-1',
     rxCode: 'RX-8841-K92',
     securityPin: '7419',
-    qrCodeData: JSON.stringify({
-      code: 'RX-8841-K92',
-      pin: '7419',
-      pat: 'Youssef Mohamed',
-      doc: 'Dr. Ahmed Hassan',
-      date: '2026-09-18',
-      v: '1.0'
-    }),
+    qrCodeData: 'https://saferx-health.vercel.app/?rx=RX-8841-K92&pin=7419',
     doctorId: DEMO_USERS.doctor.user.id,
     doctorName: DEMO_USERS.doctor.user.fullName,
     doctorSpecialty: DEMO_USERS.doctor.profile.specialty,
@@ -166,14 +159,7 @@ export const INITIAL_PRESCRIPTIONS: Prescription[] = [
     id: 'rx-seed-2',
     rxCode: 'RX-3190-M74',
     securityPin: '5820',
-    qrCodeData: JSON.stringify({
-      code: 'RX-3190-M74',
-      pin: '5820',
-      pat: 'Youssef Mohamed',
-      doc: 'Dr. Ahmed Hassan',
-      date: '2026-08-10',
-      v: '1.0'
-    }),
+    qrCodeData: 'https://saferx-health.vercel.app/?rx=RX-3190-M74&pin=5820',
     doctorId: DEMO_USERS.doctor.user.id,
     doctorName: DEMO_USERS.doctor.user.fullName,
     doctorSpecialty: DEMO_USERS.doctor.profile.specialty,
