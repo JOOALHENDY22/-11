@@ -1,147 +1,212 @@
 import { SafetyAlert, MedicationItem } from '../types';
 import { MOCK_MEDICATION_CATALOG } from '../data/mockMedications';
+import { EGYPTIAN_MEDICATIONS } from '../data/egyptianMedications';
+
+// Helper to normalize drug names for comparison
+function cleanDrugName(name: string): string {
+  return (name || '')
+    .toLowerCase()
+    .replace(/\(.*?\)/g, '')
+    .replace(/[0-9]+(\.[0-9]+)?(mg|g|mcg|ml|iu|sr|xr)?/g, '')
+    .replace(/[\/\+\-_]/g, ' ')
+    .trim();
+}
 
 export function runClinicalSafetyCheck(
   medications: MedicationItem[],
-  patientAllergies: string[],
-  patientConditions: string[]
+  patientAllergies: string[] = [],
+  patientConditions: string[] = []
 ): SafetyAlert[] {
   const alerts: SafetyAlert[] = [];
 
-  // 1. ALLERGY CHECKS
-  medications.forEach((med) => {
-    // Find catalog entry for extra metadata
-    const catalogItem = MOCK_MEDICATION_CATALOG.find(
-      (c) => c.name.toLowerCase().includes(med.name.toLowerCase()) || 
-             med.name.toLowerCase().includes(c.genericName.toLowerCase()) ||
-             c.genericName.toLowerCase().includes(med.genericName.toLowerCase())
+  const getCleanedMeds = medications.map((m) => {
+    const raw = (m.name || '').toLowerCase();
+    const clean = cleanDrugName(m.name);
+    
+    // Check in Egyptian meds
+    const egMed = EGYPTIAN_MEDICATIONS.find(
+      (e) => clean.includes(e.name.toLowerCase()) || 
+             raw.includes(e.name.toLowerCase()) || 
+             raw.includes(e.nameAr.toLowerCase())
     );
 
-    const allergensToCheck = [
-      med.name,
-      med.genericName,
-      med.drugClass || '',
-      ...(catalogItem ? catalogItem.knownAllergens : [])
-    ].filter(Boolean);
+    // Check in mock catalog
+    const mockMed = MOCK_MEDICATION_CATALOG.find(
+      (c) => clean.includes(c.name.toLowerCase()) ||
+             raw.includes(c.name.toLowerCase()) ||
+             clean.includes(c.genericName.toLowerCase())
+    );
 
+    const generic = egMed?.generic || mockMed?.genericName || m.genericName || clean;
+    const category = egMed?.category || mockMed?.category || m.drugClass || '';
+    const allergens = [
+      ...(mockMed?.knownAllergens || []),
+      ...(egMed?.category ? [egMed.category] : [])
+    ];
+
+    return {
+      original: m,
+      clean,
+      raw,
+      generic: generic.toLowerCase(),
+      category: category.toLowerCase(),
+      allergens
+    };
+  });
+
+  // 1. ALLERGY CHECKS
+  getCleanedMeds.forEach((item) => {
     patientAllergies.forEach((allergy) => {
-      const allergyLower = allergy.toLowerCase().trim();
-      const isMatch = allergensToCheck.some(item => 
-        item.toLowerCase().includes(allergyLower) || allergyLower.includes(item.toLowerCase())
-      );
+      const allg = allergy.toLowerCase().trim();
+      if (!allg) return;
 
-      // Special cross-reactivity mapping: Penicillin -> Amoxicillin, Augmentin, Ampicillin
-      const isPenicillinCross = 
-        (allergyLower.includes('penicillin') || allergyLower.includes('بنسلين')) &&
-        (med.name.toLowerCase().includes('amox') || 
-         med.name.toLowerCase().includes('augmentin') || 
-         med.genericName.toLowerCase().includes('amoxicillin') ||
-         (med.drugClass && med.drugClass.toLowerCase().includes('penicillin')));
+      const isPenicillinAllergy = allg.includes('penicillin') || allg.includes('بنسلين') || allg.includes('amox');
+      const isSulfaAllergy = allg.includes('sulfa') || allg.includes('سلفا');
+      const isNsaidAllergy = allg.includes('aspirin') || allg.includes('nsaid') || allg.includes('اسبرين') || allg.includes('مسكن');
 
-      if (isMatch || isPenicillinCross) {
+      const isPenicillinDrug = 
+        item.clean.includes('augmentin') || 
+        item.clean.includes('curam') || 
+        item.clean.includes('hibiotic') || 
+        item.clean.includes('megamox') || 
+        item.clean.includes('amox') || 
+        item.clean.includes('unictam') ||
+        item.raw.includes('أوجمنتين') || 
+        item.raw.includes('كيورام') || 
+        item.raw.includes('هاي بيوتك');
+
+      const isNsaidDrug =
+        item.clean.includes('cataflam') ||
+        item.clean.includes('voltaren') ||
+        item.clean.includes('brufen') ||
+        item.clean.includes('ketofan') ||
+        item.clean.includes('biprofenid') ||
+        item.clean.includes('aspirin') ||
+        item.raw.includes('كاتافلام') ||
+        item.raw.includes('فولتارين') ||
+        item.raw.includes('بروفين');
+
+      if ((isPenicillinAllergy && isPenicillinDrug) || (isNsaidAllergy && isNsaidDrug) || item.clean.includes(allg) || item.generic.includes(allg)) {
         alerts.push({
-          id: `allergy-${med.id}-${Date.now()}-${Math.random()}`,
+          id: `allergy-${item.original.id}-${Date.now()}`,
           type: 'allergy',
           severity: 'critical',
-          title: `CRITICAL ALLERGY CONFLICT: ${med.name}`,
-          description: `Patient has a documented severe allergy to "${allergy}". Prescribing "${med.name}" (${med.genericName}) carries high risk of anaphylaxis or severe hypersensitivity reaction.`,
-          involvedItems: [med.name, allergy],
-          recommendation: `Discontinue "${med.name}" immediately and switch to a non-beta-lactam alternative (e.g., Azithromycin or Clarithromycin after checking macrolide tolerance).`
+          title: `تحذير حساسية حرج: ${item.original.name}`,
+          description: `المريض لديه حساسية مسجلة تجاه (${allergy}). وصف (${item.original.name}) قد يسبب تفاعلات تحسسية شديدة (Anaphylaxis).`,
+          involvedItems: [item.original.name, allergy],
+          recommendation: `إيقاف الدواء فوراً واستبداله ببديل آمن لا ينتمي لنفس العائلة الدوائية.`
         });
       }
     });
   });
 
-  // 2. DRUG-DRUG INTERACTIONS
-  for (let i = 0; i < medications.length; i++) {
-    for (let j = i + 1; j < medications.length; j++) {
-      const medA = medications[i];
-      const medB = medications[j];
+  // 2. DRUG-DRUG INTERACTIONS (DDI)
+  for (let i = 0; i < getCleanedMeds.length; i++) {
+    for (let j = i + 1; j < getCleanedMeds.length; j++) {
+      const a = getCleanedMeds[i];
+      const b = getCleanedMeds[j];
 
-      const catA = MOCK_MEDICATION_CATALOG.find(c => c.name.toLowerCase().includes(medA.name.toLowerCase()) || c.genericName.toLowerCase().includes(medA.genericName.toLowerCase()));
-      const catB = MOCK_MEDICATION_CATALOG.find(c => c.name.toLowerCase().includes(medB.name.toLowerCase()) || c.genericName.toLowerCase().includes(medB.genericName.toLowerCase()));
-
-      // Check interaction catalog
-      if (catA && catA.interactions) {
-        catA.interactions.forEach(inter => {
-          if (
-            medB.name.toLowerCase().includes(inter.interactingDrugClassOrName.toLowerCase()) ||
-            medB.genericName.toLowerCase().includes(inter.interactingDrugClassOrName.toLowerCase()) ||
-            (medB.drugClass && medB.drugClass.toLowerCase().includes(inter.interactingDrugClassOrName.toLowerCase()))
-          ) {
-            alerts.push({
-              id: `interaction-${medA.id}-${medB.id}`,
-              type: 'drug_interaction',
-              severity: inter.severity,
-              title: `DRUG INTERACTION: ${medA.name} + ${medB.name}`,
-              description: inter.description,
-              involvedItems: [medA.name, medB.name],
-              recommendation: `Review dosage or consider spaced administration / safer alternative under close monitoring.`
-            });
-          }
-        });
-      }
-
-      // Check reverse
-      if (catB && catB.interactions) {
-        catB.interactions.forEach(inter => {
-          if (
-            medA.name.toLowerCase().includes(inter.interactingDrugClassOrName.toLowerCase()) ||
-            medA.genericName.toLowerCase().includes(inter.interactingDrugClassOrName.toLowerCase()) ||
-            (medA.drugClass && medA.drugClass.toLowerCase().includes(inter.interactingDrugClassOrName.toLowerCase()))
-          ) {
-            // Avoid duplicates
-            if (!alerts.some(a => a.id === `interaction-${medA.id}-${medB.id}` || a.id === `interaction-${medB.id}-${medA.id}`)) {
-              alerts.push({
-                id: `interaction-${medB.id}-${medA.id}`,
-                type: 'drug_interaction',
-                severity: inter.severity,
-                title: `DRUG INTERACTION: ${medB.name} + ${medA.name}`,
-                description: inter.description,
-                involvedItems: [medB.name, medA.name],
-                recommendation: `Monitor clinical parameters closely or substitute one of the interacting agents.`
-              });
-            }
-          }
-        });
-      }
-
-      // 3. DUPLICATE THERAPY CHECK (e.g. same class)
-      if (medA.drugClass && medB.drugClass && medA.drugClass.toLowerCase() === medB.drugClass.toLowerCase() && medA.name !== medB.name) {
+      // A: NSAID + NSAID (Duplicate NSAID toxicity)
+      const isNsaidA = a.clean.includes('cataflam') || a.clean.includes('voltaren') || a.clean.includes('brufen') || a.clean.includes('ketofan') || a.clean.includes('biprofenid') || a.raw.includes('كاتافلام') || a.raw.includes('فولتارين');
+      const isNsaidB = b.clean.includes('cataflam') || b.clean.includes('voltaren') || b.clean.includes('brufen') || b.clean.includes('ketofan') || b.clean.includes('biprofenid') || b.raw.includes('كاتافلام') || b.raw.includes('فولتارين');
+      if (isNsaidA && isNsaidB) {
         alerts.push({
-          id: `duplicate-${medA.id}-${medB.id}`,
+          id: `interaction-nsaid-double-${i}-${j}`,
           type: 'duplicate_therapy',
+          severity: 'critical',
+          title: `تعارض دوائي ومضاعفة مسكنات (NSAIDs Toxicity)`,
+          description: `وصف مسكنين من عائلة مضادات الالتهاب غير الستيرويدية (${a.original.name} + ${b.original.name}) يضاعف خطر قرحة ونزيف المعدة والفشل الكلوي الحاد دون فائدة علاجية إضافية.`,
+          involvedItems: [a.original.name, b.original.name],
+          recommendation: `الاكتفاء بمسكن واحد فقط مع إضافة واقي معدة (مثل كنترولوك أو نيكسيوم) عند الضرورة.`
+        });
+      }
+
+      // B: NSAID + Blood Thinners (Aspirin/Warfarin/Plavix)
+      const isBloodThinnerA = a.clean.includes('warfarin') || a.clean.includes('plavix') || a.clean.includes('aspirin') || a.clean.includes('clexane') || a.clean.includes('xarelto');
+      const isBloodThinnerB = b.clean.includes('warfarin') || b.clean.includes('plavix') || b.clean.includes('aspirin') || b.clean.includes('clexane') || b.clean.includes('xarelto');
+      if ((isNsaidA && isBloodThinnerB) || (isNsaidB && isBloodThinnerA)) {
+        alerts.push({
+          id: `interaction-nsaid-bleeding-${i}-${j}`,
+          type: 'drug_interaction',
+          severity: 'critical',
+          title: `خطر نزيف هضمي مرتفع (Bleeding Risk)`,
+          description: `تناول (${a.original.name} مع ${b.original.name}) يرفع بشدة احتمال النزيف المعدي المعوي والسيولة المفرطة.`,
+          involvedItems: [a.original.name, b.original.name],
+          recommendation: `استبدال المسكن بالباراسيتامول (بنادول) الآمن مع أدوية السيولة.`
+        });
+      }
+
+      // C: Beta-Blocker (Concor) + Verapamil/Diltiazem
+      const isBetaBlockerA = a.clean.includes('concor') || a.clean.includes('bisocard') || a.generic.includes('bisoprolol');
+      const isBetaBlockerB = b.clean.includes('concor') || b.clean.includes('bisocard') || b.generic.includes('bisoprolol');
+      const isCCBA = a.clean.includes('verapamil') || a.clean.includes('diltiazem');
+      const isCCBB = b.clean.includes('verapamil') || b.clean.includes('diltiazem');
+      if ((isBetaBlockerA && isCCBB) || (isBetaBlockerB && isCCBA)) {
+        alerts.push({
+          id: `interaction-heart-block-${i}-${j}`,
+          type: 'drug_interaction',
+          severity: 'critical',
+          title: `تداخل قلبي خطير (Bradycardia & Heart Block)`,
+          description: `الجمع بين (${a.original.name} و ${b.original.name}) يسبب هبوط حاد في ضربات القلب وضغط الدم وخطر توقف القلب.`,
+          involvedItems: [a.original.name, b.original.name],
+          recommendation: `تجنب الجمع بينهما واستشارة طبيب القلب المعالج.`
+        });
+      }
+
+      // D: Metformin + Contrast or Ciprofloxacin + Dairy/Antacids
+      const isQuinoloneA = a.clean.includes('cipro') || a.clean.includes('tavanic') || a.clean.includes('tarivid');
+      const isQuinoloneB = b.clean.includes('cipro') || b.clean.includes('tavanic') || b.clean.includes('tarivid');
+      const isAntacidA = a.clean.includes('caltrate') || a.clean.includes('osteocare') || a.clean.includes('feroglobin');
+      const isAntacidB = b.clean.includes('caltrate') || b.clean.includes('osteocare') || b.clean.includes('feroglobin');
+      if ((isQuinoloneA && isAntacidB) || (isQuinoloneB && isAntacidA)) {
+        alerts.push({
+          id: `interaction-absorption-${i}-${j}`,
+          type: 'drug_interaction',
           severity: 'warning',
-          title: `DUPLICATE THERAPY DETECTED: ${medA.drugClass}`,
-          description: `Both ${medA.name} and ${medB.name} belong to the same therapeutic class (${medA.drugClass}). Combining multiple agents from this class may increase toxicity without added therapeutic efficacy.`,
-          involvedItems: [medA.name, medB.name],
-          recommendation: `Confirm whether dual therapy is clinically intentional or consolidate to single agent optimization.`
+          title: `نقص امتصاص المضاد الحيوي (Chelation Interaction)`,
+          description: `تناول المكملات أو المعادن مع سيبروفلوكساسين/تافانيك يمنع امتصاص المضاد الحيوي في المعدة.`,
+          involvedItems: [a.original.name, b.original.name],
+          recommendation: `الفصل بفاصل زمني لا يقل عن ساعتين إلى 3 ساعات بين الدوائين.`
         });
       }
     }
   }
 
-  // 4. CONTRAINDICATION WITH CHRONIC CONDITIONS
-  medications.forEach(med => {
-    const catalogItem = MOCK_MEDICATION_CATALOG.find(c => c.name.toLowerCase().includes(med.name.toLowerCase()) || c.genericName.toLowerCase().includes(med.genericName.toLowerCase()));
-    if (catalogItem && catalogItem.contraindicatedConditions) {
-      patientConditions.forEach(cond => {
-        const match = catalogItem.contraindicatedConditions.find(c => 
-          c.toLowerCase().includes(cond.toLowerCase()) || cond.toLowerCase().includes(c.toLowerCase())
-        );
-        if (match) {
-          alerts.push({
-            id: `condition-${med.id}-${cond}`,
-            type: 'dosage_warning',
-            severity: 'warning',
-            title: `DISEASE CONTRAINDICATION: ${med.name} with ${cond}`,
-            description: `${med.name} carries contraindications or precaution warnings for patients with documented ${cond}.`,
-            involvedItems: [med.name, cond],
-            recommendation: `Assess renal/hepatic/cardiac status before administering.`
-          });
-        }
-      });
-    }
+  // 3. CHRONIC CONDITIONS CONTRAINDICATIONS
+  getCleanedMeds.forEach((item) => {
+    patientConditions.forEach((cond) => {
+      const c = cond.toLowerCase().trim();
+      if (!c) return;
+
+      const isAsthma = c.includes('asthma') || c.includes('حساسية صدر') || c.includes('ربو');
+      const isUlcer = c.includes('ulcer') || c.includes('قرحة') || c.includes('gerd');
+      const isHypertension = c.includes('hypertension') || c.includes('ضغط');
+      const isKidney = c.includes('renal') || c.includes('kidney') || c.includes('كلى');
+
+      if (isAsthma && (item.clean.includes('concor') || item.clean.includes('inderal') || item.clean.includes('cataflam') || item.clean.includes('voltaren') || item.clean.includes('aspirin'))) {
+        alerts.push({
+          id: `condition-asthma-${item.original.id}`,
+          type: 'dosage_warning',
+          severity: 'warning',
+          title: `تحذير مع حساسية الصدر / الربو: ${item.original.name}`,
+          description: `الدواء (${item.original.name}) قد يحفز انقباض الشعب الهوائية أو نوبة ربو حادة لدى مرضى حساسية الصدر.`,
+          involvedItems: [item.original.name, cond],
+          recommendation: `المتابعة الدقيقة واستخدام موسع الشعب المناسب.`
+        });
+      }
+
+      if (isUlcer && (item.clean.includes('cataflam') || item.clean.includes('voltaren') || item.clean.includes('brufen') || item.clean.includes('aspirin'))) {
+        alerts.push({
+          id: `condition-ulcer-${item.original.id}`,
+          type: 'dosage_warning',
+          severity: 'warning',
+          title: `تحذير قرحة المعدة: ${item.original.name}`,
+          description: `المسكنات غير الستيرويدية تزيد من تهيج ونزيف جدار المعدة لدى مرضى القرحة.`,
+          involvedItems: [item.original.name, cond],
+          recommendation: `وصف باراسيتامول أو حماية المعدة بمثبط مضخة بروتون.`
+        });
+      }
+    });
   });
 
   return alerts;

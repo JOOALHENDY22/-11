@@ -71,7 +71,10 @@ export class AiSafetyService {
     // Baseline deterministic safety report
     const fallbackReport: AiSafetyReport = this.generateDeterministicReport(prescription, localAlerts);
 
-    if (!apiKey) {
+    // Simulate smooth processing delay if offline/instant
+    await new Promise(resolve => setTimeout(resolve, 600));
+
+    if (!apiKey || apiKey.startsWith('sk-test') || apiKey.length < 20) {
       return fallbackReport;
     }
 
@@ -119,8 +122,12 @@ Note: "status" must be one of: "safe" | "caution" | "critical".
 `;
 
       const baseUrl = this.getBaseUrl().replace(/\/+$/, '');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
       const response = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
@@ -141,6 +148,7 @@ Note: "status" must be one of: "safe" | "caution" | "critical".
           max_tokens: 1200
         })
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`AI API responded with status ${response.status}`);
@@ -164,7 +172,7 @@ Note: "status" must be one of: "safe" | "caution" | "critical".
         isAiGenerated: true
       };
     } catch (err) {
-      console.warn('[AiSafetyService Live Call Fallback]', err);
+      console.warn('[AiSafetyService Live Call Fallback to Clinical Rules]', err);
       return fallbackReport;
     }
   }
