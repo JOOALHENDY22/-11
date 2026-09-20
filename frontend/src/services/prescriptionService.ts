@@ -31,7 +31,7 @@ export class PrescriptionService {
 
     if (!cleanUserEmail && !cleanUserName) return [];
 
-    return prescriptions.filter(p => {
+    const strictlyOwned = prescriptions.filter(p => {
       const docEmail = (p.doctorEmail || '').trim().toLowerCase();
       if (docEmail && cleanUserEmail) {
         return docEmail === cleanUserEmail;
@@ -42,6 +42,13 @@ export class PrescriptionService {
       }
       return false;
     });
+
+    // If SuperAdmin is testing as a doctor and has no prescriptions yet, show all to facilitate testing
+    if (strictlyOwned.length === 0 && cleanUserEmail === 'jooalhendy@gmail.com') {
+      return prescriptions;
+    }
+
+    return strictlyOwned;
   }
 
   /**
