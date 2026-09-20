@@ -51,6 +51,7 @@ import { AdminDashboard } from './components/admin/AdminDashboard';
 import { AiSafetyVerificationCard } from './components/pharmacist/AiSafetyVerificationCard';
 import { EgyptianMedicationInput } from './components/doctor/EgyptianMedicationInput';
 import { EgyptianMedication } from './data/egyptianMedications';
+import { AiSafetyService } from './services/aiSafetyService';
 
 // ==========================================
 // 1. SUPABASE CLIENT & BACKEND CONFIGURATION
@@ -1833,6 +1834,8 @@ const CreateRxModalComponent: React.FC<{
   const [notes, setNotes] = useState(initialData?.clinicalNotes || '');
   const [bp, setBp] = useState(initialData?.vitals?.bp || '');
   const [hr, setHr] = useState(initialData?.vitals?.hr || '');
+  const [aiSuggesting, setAiSuggesting] = useState(false);
+  const [aiAdvice, setAiAdvice] = useState<string | null>(null);
   const [medications, setMedications] = useState<MedicationItem[]>(() => {
     if (initialData?.medications && initialData.medications.length > 0) {
       return initialData.medications;
@@ -1851,6 +1854,44 @@ const CreateRxModalComponent: React.FC<{
   });
 
   if (!isOpen) return null;
+
+  const handleSuggestMedsFromDiagnosis = async () => {
+    if (!diagnosis || diagnosis.trim().length < 2) {
+      alert('يرجى إدخال التشخيص الطبي أولاً لاقتراح الأدوية المناسبة بالذكاء الاصطناعي');
+      return;
+    }
+    setAiSuggesting(true);
+    setAiAdvice(null);
+    try {
+      const allergyList = allergies ? allergies.split(',').map(s => s.trim()).filter(Boolean) : [];
+      const result = await AiSafetyService.suggestPrescriptionForDiagnosis(
+        diagnosis.trim(),
+        allergyList,
+        patientAge
+      );
+      if (result.medications && result.medications.length > 0) {
+        const mapped: MedicationItem[] = result.medications.map((m: any, idx: number) => ({
+          id: `med-ai-${Date.now()}-${idx}`,
+          name: m.name || '',
+          dosage: m.dosage || '',
+          frequency: m.frequency || t.freqTwice,
+          duration: m.duration || t.dur7Days,
+          timing: m.timing || 'after_meal',
+          quantity: m.quantity || 1
+        }));
+        setMedications(mapped);
+        if (result.clinicalAdvice) {
+          setAiAdvice(result.clinicalAdvice);
+        }
+      } else {
+        alert('تعذر جلب اقتراحات تلقائية للحالة حالياً. يمكنك استخدام البحث السريع لاختيار الأدوية.');
+      }
+    } catch (err) {
+      console.warn('[AI Suggest Meds Error]', err);
+    } finally {
+      setAiSuggesting(false);
+    }
+  };
 
   const handleAddMed = (preset?: { name: string; dosage: string; frequencyKey: string; timing: string }) => {
     const freq = preset ? (t as any)[preset.frequencyKey] : t.freqTwice;
@@ -1974,10 +2015,30 @@ const CreateRxModalComponent: React.FC<{
 
           {/* Clinical Info & Vitals */}
           <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 space-y-3">
-            <span className="text-xs font-bold text-slate-900 dark:text-white block flex items-center gap-1.5">
-              <Activity className="w-4 h-4 text-teal-600" />
-              <span>{t.modalSecClinical}</span>
-            </span>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Activity className="w-4 h-4 text-teal-600" />
+                <span>{t.modalSecClinical}</span>
+              </span>
+              <button
+                type="button"
+                onClick={handleSuggestMedsFromDiagnosis}
+                disabled={aiSuggesting || !diagnosis.trim()}
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-teal-600 via-teal-500 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-bold text-[11px] shadow-sm flex items-center gap-1.5 transition-all disabled:opacity-40 cursor-pointer active:scale-98"
+              >
+                {aiSuggesting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>جارٍ اقتراح البروتوكول بالذكاء الاصطناعي...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+                    <span>✨ اقتراح أدوية مصرية للتشخيص (Gemini)</span>
+                  </>
+                )}
+              </button>
+            </div>
             <input
               type="text"
               value={diagnosis}
@@ -1985,6 +2046,15 @@ const CreateRxModalComponent: React.FC<{
               placeholder={t.modalDiagnosisPlaceholder}
               className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:outline-none"
             />
+            {aiAdvice && (
+              <div className="p-3 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800/60 text-teal-900 dark:text-teal-200 text-xs flex items-start gap-2 animate-fade-in">
+                <Sparkles className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold block text-[11px] text-teal-800 dark:text-teal-300 mb-0.5">توصية البروتوكول الذكي:</span>
+                  <span>{aiAdvice}</span>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <input
                 type="text"

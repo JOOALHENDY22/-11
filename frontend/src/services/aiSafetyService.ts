@@ -194,6 +194,176 @@ ${prescription.medications.map((m, i) => `  ${i + 1}. الاسم: ${m.name}, ا�
   }
 
   /**
+   * AI-Powered Prescription Suggester for Doctors based on diagnosis & patient history.
+   * Utilizes Gemini multi-key rotation to suggest available Egyptian medications.
+   */
+  public static async suggestPrescriptionForDiagnosis(
+    diagnosis: string,
+    allergies: string[] = [],
+    patientAge?: string
+  ): Promise<{ medications: any[]; clinicalAdvice: string }> {
+    if (!diagnosis || diagnosis.trim().length < 2) {
+      return { medications: [], clinicalAdvice: '' };
+    }
+
+    const prompt = `
+أنت مستشار ذكاء اصطناعي إكلينيكي متخصص في الأدوية المتوفرة في جمهورية مصر العربية.
+بناءً على تشخيص المريض: "${diagnosis}"
+- عمر المريض: "${patientAge || 'بالغ'}"
+- حساسية المريض: "${allergies.join(', ') || 'لا توجد'}"
+
+اقترح من 2 إلى 4 أدوية مصرية مشهورة مناسبة تماماً ومتوافقة مع بعضها لعلاج هذه الحالة مع الجرعات والتوقيت الصحيح.
+أجب فقط بصيغة JSON مطابقة للشكل التالي:
+{
+  "clinicalAdvice": "نصيحة إكلينيكية مختصرة للطبيب بالعربية",
+  "medications": [
+    {
+      "name": "اسم الدواء بالإنجليزي والعربي مثل: Augmentin (أوجمنتين)",
+      "dosage": "1g (1000mg)",
+      "frequency": "مرتين يومياً (كل 12 ساعة)",
+      "duration": "7 أيام",
+      "timing": "after_meal",
+      "quantity": 1
+    }
+  ]
+}
+ملاحظة: حقل "timing" يجب أن يكون حصراً: "before_meal" أو "after_meal" أو "with_meal" أو "bedtime".
+`;
+
+    const keys = this.getApiKeyList();
+    const modelsToTry = ['gemini-flash-latest', 'gemini-flash-lite-latest'];
+
+    for (let attempt = 0; attempt < keys.length; attempt++) {
+      const activeKey = keys[(currentKeyIndex + attempt) % keys.length];
+
+      for (const modelName of modelsToTry) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 7000);
+
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${activeKey}`,
+            {
+              method: 'POST',
+              signal: controller.signal,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                  temperature: 0.2,
+                  maxOutputTokens: 1000
+                }
+              })
+            }
+          );
+          clearTimeout(timeoutId);
+
+          if (response.status === 429 || response.status === 403) {
+            currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+            break;
+          }
+
+          if (!response.ok) continue;
+
+          const resData = await response.json();
+          const rawText = resData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+          const cleanJson = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/```$/i, '').trim();
+          const parsed = JSON.parse(cleanJson);
+
+          if (parsed && Array.isArray(parsed.medications)) {
+            return {
+              medications: parsed.medications,
+              clinicalAdvice: parsed.clinicalAdvice || 'تم اقتراح الأدوية المصرية المناسبة سريرياً للحالة.'
+            };
+          }
+        } catch (err) {
+          console.warn('[Gemini suggestPrescriptionForDiagnosis Error]', err);
+        }
+      }
+    }
+
+    return { medications: [], clinicalAdvice: '' };
+  }
+
+  /**
+   * AI live search/lookup for Egyptian medication by partial query using Gemini.
+   */
+  public static async lookupMedicationDetails(query: string): Promise<any[]> {
+    if (!query || query.trim().length < 2) return [];
+
+    const prompt = `
+أنت قاعدة بيانات ذكية للأدوية في مصر ومساعد للصيدلي والطبيب.
+المستخدم يبحث عن دواء باسم أو جزء من اسم: "${query}"
+اقترح حتى 4 أدوية تجارية متداولة في الصيدليات المصرية تطابق هذا البحث.
+أجب فقط بـ JSON صحيح كالتالي:
+[
+  {
+    "id": "med_custom_1",
+    "name": "اسم الدواء بالإنجليزية",
+    "nameAr": "الاسم بالعربي",
+    "generic": "المادة الفعالة",
+    "category": "cardio | antibiotic | gastro | analgesia | respiratory | endocrine | psychiatric | general",
+    "categoryAr": "التصنيف بالعربي",
+    "defaultDosage": "التركيز الأكثر شيوعاً مثل 500mg أو 10mg",
+    "defaultFrequency": "مرتين يومياً",
+    "defaultTiming": "after_meal"
+  }
+]
+`;
+
+    const keys = this.getApiKeyList();
+    const modelsToTry = ['gemini-flash-latest', 'gemini-flash-lite-latest'];
+
+    for (let attempt = 0; attempt < keys.length; attempt++) {
+      const activeKey = keys[(currentKeyIndex + attempt) % keys.length];
+
+      for (const modelName of modelsToTry) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${activeKey}`,
+            {
+              method: 'POST',
+              signal: controller.signal,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                  temperature: 0.1,
+                  maxOutputTokens: 800
+                }
+              })
+            }
+          );
+          clearTimeout(timeoutId);
+
+          if (response.status === 429 || response.status === 403) {
+            currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+            break;
+          }
+
+          if (!response.ok) continue;
+
+          const resData = await response.json();
+          const rawText = resData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+          const cleanJson = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/```$/i, '').trim();
+          const parsed = JSON.parse(cleanJson);
+
+          if (Array.isArray(parsed)) {
+            return parsed;
+          }
+        } catch (err) {
+          console.warn('[Gemini lookupMedicationDetails Error]', err);
+        }
+      }
+    }
+
+    return [];
+  }
+
+  /**
    * Deterministic local clinical safety engine.
    */
   private static generateDeterministicReport(rx: Prescription, localAlerts: any[]): AiSafetyReport {
