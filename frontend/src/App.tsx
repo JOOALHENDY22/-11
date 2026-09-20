@@ -1298,37 +1298,6 @@ const PharmacistStation: React.FC<{
           </button>
         </form>
 
-        {/* Quick Prescription Selector Chips */}
-        {prescriptions && prescriptions.length > 0 && (
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
-            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block">
-              {language === 'ar' ? '⚡ اختر روشتة فوراً للفحص المباشر بالذكاء الاصطناعي:' : '⚡ Select prescription for instant AI check:'}
-            </span>
-            <div className="flex items-center gap-2 flex-wrap">
-              {prescriptions.map((rx) => (
-                <button
-                  key={rx.id}
-                  type="button"
-                  onClick={() => {
-                    setRxCodeInput(rx.rxCode);
-                    setSearchedRx(rx);
-                    setErrorMessage(null);
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 border ${
-                    searchedRx?.id === rx.id
-                      ? 'bg-teal-600 text-white border-teal-600 shadow-sm'
-                      : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-teal-500 hover:text-teal-600'
-                  }`}
-                >
-                  <Sparkles className="w-3 h-3 text-teal-400" />
-                  <span>{rx.rxCode}</span>
-                  <span className="text-[10px] font-sans opacity-80 font-normal">({rx.patientName})</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         {errorMessage && (
           <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-800 dark:text-rose-300 text-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
@@ -1337,63 +1306,7 @@ const PharmacistStation: React.FC<{
         )}
       </div>
 
-      {/* Prescription Queue List when no specific Rx is selected */}
-      {!searchedRx && prescriptions && prescriptions.length > 0 && (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 border border-slate-200/90 dark:border-slate-800 shadow-card space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-teal-600" />
-              <span>{language === 'ar' ? 'الروشتات المتاحة للفحص والصرف الإكلينيكي' : 'Prescriptions Ready for Verification'}</span>
-            </h3>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 font-bold border border-teal-200 dark:border-teal-800">
-              {prescriptions.length} {language === 'ar' ? 'روشتة' : 'Prescriptions'}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-            {prescriptions.map((rx) => (
-              <div 
-                key={rx.id}
-                className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 hover:border-teal-500/50 transition-all flex flex-col justify-between gap-3"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className="font-mono text-base font-black text-teal-700 dark:text-teal-400 block">{rx.rxCode}</span>
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-100 block mt-0.5">{rx.patientName}</span>
-                    <span className="text-[11px] text-slate-400 block">د. {rx.doctorName} • {rx.diagnosis || 'تشخيص عام'}</span>
-                  </div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                    rx.status === 'dispensed'
-                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20'
-                      : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20'
-                  }`}>
-                    {rx.status === 'dispensed' ? (language === 'ar' ? 'تم الصرف' : 'Dispensed') : (language === 'ar' ? 'جاهزة للفحص' : 'Ready')}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                    {rx.medications.length} {language === 'ar' ? 'أدوية موصوفة' : 'Medications'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRxCodeInput(rx.rxCode);
-                      setSearchedRx(rx);
-                    }}
-                    className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-teal-200" />
-                    <span>{language === 'ar' ? 'فحص بالذكاء الاصطناعي ⚡' : 'AI Verify & Inspect'}</span>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Prescription Result Display */}
+      {/* Prescription Result Display (Only when searched) */}
       {searchedRx && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 border border-slate-200/90 dark:border-slate-800 shadow-card space-y-6 animate-slide-up">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
