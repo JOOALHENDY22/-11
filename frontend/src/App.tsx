@@ -2029,12 +2029,12 @@ const CreateRxModalComponent: React.FC<{
                 {aiSuggesting ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>جارٍ اقتراح البروتوكول بالذكاء الاصطناعي...</span>
+                    <span>جارٍ اقتراح البروتوكول الدوائي بالذكاء الاصطناعي...</span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-                    <span>✨ اقتراح أدوية مصرية للتشخيص (Gemini)</span>
+                    <span>✨ اقتراح بروتوكول الأدوية المناسبة للتشخيص</span>
                   </>
                 )}
               </button>

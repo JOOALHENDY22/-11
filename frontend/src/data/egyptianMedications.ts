@@ -1,4 +1,4 @@
-﻿export interface EgyptianMedication {
+export interface EgyptianMedication {
   id: string;
   name: string;
   nameAr: string;
@@ -876,38 +876,402 @@ export const EGYPTIAN_MEDICATIONS: EgyptianMedication[] = [
     dosages: ['كبسولات جيلاتينية'],
     defaultFrequency: 'كبسولة واحدة يومياً بعد الغداء',
     defaultTiming: 'after_meal'
+  },
+  {
+    id: 'eg-med-72',
+    name: 'Betaserc',
+    nameAr: 'بيتاسيرك لدوار الأذن والدوخة',
+    generic: 'Betahistine Dihydrochloride',
+    category: 'Antivertigo',
+    categoryAr: 'علاج الدوخة والدوار وطنين الأذن وضعف التوازن',
+    defaultDosage: '16mg',
+    dosages: ['16mg', '24mg', '8mg'],
+    defaultFrequency: 'قرص مرتين إلى 3 مرات يومياً مع الوجبات',
+    defaultTiming: 'with_meal'
+  },
+  {
+    id: 'eg-med-73',
+    name: 'Stugeron',
+    nameAr: 'ستوجيرون',
+    generic: 'Cinnarizine',
+    category: 'Vasodilator / Antivertigo',
+    categoryAr: 'علاج دوار الحركة والدوخة وتنشيط الدورة الدموية المخية',
+    defaultDosage: '25mg',
+    dosages: ['25mg', '75mg Forte'],
+    defaultFrequency: 'قرص 3 مرات يومياً بعد الأكل',
+    defaultTiming: 'after_meal'
+  },
+  {
+    id: 'eg-med-74',
+    name: 'Daflon 500',
+    nameAr: 'دافلون 500 للبواسير والأوردة',
+    generic: 'Purified Flavonoid Fraction (Diosmin + Hesperidin)',
+    category: 'Phlebotropic',
+    categoryAr: 'علاج البواسير الشديدة ودوالي الساقين ونزيف الأوردة',
+    defaultDosage: '500mg',
+    dosages: ['500mg', '1000mg'],
+    defaultFrequency: 'قرصين يومياً بعد الغداء والعشاء',
+    defaultTiming: 'after_meal'
+  },
+  {
+    id: 'eg-med-75',
+    name: 'Reparil Dragees',
+    nameAr: 'ريباريل أقراص للتورم',
+    generic: 'Aescin (Escin) 40mg',
+    category: 'Anti-edema & Anti-inflammatory',
+    categoryAr: 'علاج التورم والارتشاح ودوالي الساقين والبواسير والرضوض',
+    defaultDosage: '40mg Dragees',
+    dosages: ['40mg', '20mg'],
+    defaultFrequency: 'قرصين 3 مرات يومياً بعد الأكل',
+    defaultTiming: 'after_meal'
+  },
+  {
+    id: 'eg-med-76',
+    name: 'Kenacomb Cream / Ointment',
+    nameAr: 'كيناكورم كريم / مرهم',
+    generic: 'Triamcinolone + Neomycin + Gramicidin + Nystatin',
+    category: 'Topical Steroid / Antibacterial / Antifungal',
+    categoryAr: 'علاج التهابات الجلد والتسلخات الشديدة والإكزيما',
+    defaultDosage: 'Cream / Ointment 15g / 30g',
+    dosages: ['كريم', 'مرهم'],
+    defaultFrequency: 'دهان موضعي على المكان المصاب مرتين إلى 3 مرات يومياً',
+    defaultTiming: 'anytime'
+  },
+  {
+    id: 'eg-med-77',
+    name: 'Fucidin Cream / Ointment',
+    nameAr: 'فيوسيدين كريم (الخط الأحمر/البرتقالي)',
+    generic: 'Fusidic Acid / Sodium Fusidate',
+    category: 'Topical Antibiotic',
+    categoryAr: 'مضاد حيوي موضعي للدمامل وحب الشباب والجروح والعدوى الجلدية',
+    defaultDosage: '2% Cream / Ointment',
+    dosages: ['كريم (خط أحمر)', 'مرهم (خط برتقالي)'],
+    defaultFrequency: 'دهان مرتين إلى 3 مرات يومياً بعد تنظيف المكان',
+    defaultTiming: 'anytime'
+  },
+  {
+    id: 'eg-med-78',
+    name: 'Fucicort Cream',
+    nameAr: 'فيوسيكورت كريم (الخط البرتقالي والأحمر)',
+    generic: 'Fusidic Acid + Betamethasone',
+    category: 'Topical Antibiotic + Corticosteroid',
+    categoryAr: 'علاج الإكزيما والتهابات الجلد التحسسية واللدغات',
+    defaultDosage: 'Cream 15g / 30g',
+    dosages: ['كريم 15 جم', 'كريم 30 جم'],
+    defaultFrequency: 'دهان طبقة رقيقة مرتين يومياً لمدة أسبوع فقط',
+    defaultTiming: 'anytime'
+  },
+  {
+    id: 'eg-med-79',
+    name: 'Betaderm Cream / Ointment',
+    nameAr: 'بيتاديرم كريم / مرهم',
+    generic: 'Betamethasone Valerate 0.1%',
+    category: 'Topical Corticosteroid',
+    categoryAr: 'علاج الحكة الشديدة والصدفية والإكزيما والتحسس الجلدي',
+    defaultDosage: '0.1% Cream / Ointment',
+    dosages: ['كريم', 'مرهم'],
+    defaultFrequency: 'دهان موضعي مرة إلى مرتين يومياً',
+    defaultTiming: 'anytime'
+  },
+  {
+    id: 'eg-med-80',
+    name: 'Mebo Ointment',
+    nameAr: 'ميبو مرهم حروق',
+    generic: 'Beta-Sitosterol + Sesame Oil + Beeswax',
+    category: 'Burns & Wound Healing',
+    categoryAr: 'علاج الحروق بمختلف درجاتها وترميم وتجديد خلايا الجلد والجروح',
+    defaultDosage: 'Ointment 15g / 30g / 75g',
+    dosages: ['مرهم 15 جم', 'مرهم 30 جم', 'مرهم 75 جم'],
+    defaultFrequency: 'وضع طبقة رقيقة على الحرق كل 4 إلى 6 ساعات',
+    defaultTiming: 'anytime'
+  },
+  {
+    id: 'eg-med-81',
+    name: 'Panthenol Cream',
+    nameAr: 'بانثينول كريم مرطب وملطف',
+    generic: 'D-Panthenol (Pro-Vitamin B5)',
+    category: 'Moisturizer & Skin Repair',
+    categoryAr: 'ترطيب وتنعيم الجلد الجاف والتئام التشققات وتسلخات الحفاض',
+    defaultDosage: 'Cream 20g / 50g',
+    dosages: ['كريم 20 جم', 'كريم 50 جم'],
+    defaultFrequency: 'دهان مرتين إلى 3 مرات يومياً عند الحاجة',
+    defaultTiming: 'anytime'
+  },
+  {
+    id: 'eg-med-82',
+    name: 'Voltaren Emulgel',
+    nameAr: 'فولتارين إيمولجيل موضعي',
+    generic: 'Diclofenac Diethylamine',
+    category: 'Topical NSAID Analgesic',
+    categoryAr: 'مسكن ومضاد لالتهاب العضلات والمفاصل والكدمات والالتواء',
+    defaultDosage: 'Gel 50g / 100g',
+    dosages: ['جل 50 جم', 'جل 100 جم', 'فولتارين إكسترا فورت'],
+    defaultFrequency: 'تدليك مكان الألم برفق من 3 إلى 4 مرات يومياً',
+    defaultTiming: 'anytime'
+  },
+  {
+    id: 'eg-med-83',
+    name: 'Reparil-Gel N',
+    nameAr: 'ريباريل جل للكدمات والورم',
+    generic: 'Aescin + Diethylamine Salicylate',
+    category: 'Anti-inflammatory & Anti-edema Gel',
+    categoryAr: 'إزالة التورم والكدمات وتجمعات الدم والالتواءات وآلام الظهر',
+    defaultDosage: 'Gel 40g',
+    dosages: ['جل 40 جم'],
+    defaultFrequency: 'دهان وتدليك لطيف على الكدمة أو الورم 3 مرات يومياً',
+    defaultTiming: 'anytime'
+  },
+  {
+    id: 'eg-med-84',
+    name: 'Tobradex Eye Drops',
+    nameAr: 'توبزادكس قطرة عين',
+    generic: 'Tobramycin + Dexamethasone',
+    category: 'Ophthalmic Antibiotic + Steroid',
+    categoryAr: 'علاج التهابات العين المصحوبة بعدوى بكتيرية',
+    defaultDosage: 'Eye Drops 5ml',
+    dosages: ['قطرة عين 5 مل', 'مرهم عين'],
+    defaultFrequency: 'نقطة واحدة في العين المصابة كل 4 إلى 6 ساعات',
+    defaultTiming: 'anytime'
+  },
+  {
+    id: 'eg-med-85',
+    name: 'Systane Ultra Eye Drops',
+    nameAr: 'سيستان ألترا قطرة ترطيب العين',
+    generic: 'Polyethylene Glycol + Propylene Glycol',
+    category: 'Lubricant Eye Drops',
+    categoryAr: 'ترطيب وحماية العين من الجفاف والإجهاد واحمرار الشاشات',
+    defaultDosage: 'Eye Drops 10ml',
+    dosages: ['قطرة 10 مل'],
+    defaultFrequency: 'نقطة في كل عين عند اللزوم',
+    defaultTiming: 'anytime'
+  },
+  {
+    id: 'eg-med-86',
+    name: 'Otal Ear Drops',
+    nameAr: 'أوتال قطرة أذن',
+    generic: 'Framycetin + Dexamethasone + Cinchocaine',
+    category: 'Otic Drops',
+    categoryAr: 'مسكن لآلام الأذن وعلاج التهاب الأذن الخارجية والوسطى',
+    defaultDosage: 'Ear Drops 10ml',
+    dosages: ['قطرة أذن'],
+    defaultFrequency: '3 إلى 4 نقط في الأذن المصابة 3 مرات يومياً',
+    defaultTiming: 'anytime'
+  },
+  {
+    id: 'eg-med-87',
+    name: 'Viotic Ear Drops',
+    nameAr: 'فيوتيك قطرة أذن',
+    generic: 'Fludrocortisone + Polymyxin B + Neomycin + Lidocaine',
+    category: 'Otic Drops',
+    categoryAr: 'مضاد لالتهاب والآم الأذن والفطريات',
+    defaultDosage: 'Ear Drops 10ml',
+    dosages: ['قطرة 10 مل'],
+    defaultFrequency: '3 نقط مرتين يومياً',
+    defaultTiming: 'anytime'
+  },
+  {
+    id: 'eg-med-88',
+    name: 'Alzental',
+    nameAr: 'الزنتال لطرد الديدان',
+    generic: 'Albendazole',
+    category: 'Anthelmintic',
+    categoryAr: 'علاج الديدان المعوية والدبوسية والشريطية',
+    defaultDosage: '200mg',
+    dosages: ['200mg أقراص مضغ', 'شراب الزنتال'],
+    defaultFrequency: 'قرصين للمضغ جرعة واحدة وتكرر بعد أسبوعين',
+    defaultTiming: 'after_meal'
+  },
+  {
+    id: 'eg-med-89',
+    name: 'Vermizole',
+    nameAr: 'فيرميزول',
+    generic: 'Mebendazole',
+    category: 'Anthelmintic',
+    categoryAr: 'طارد لديدان البطن',
+    defaultDosage: '100mg',
+    dosages: ['100mg أقراص', 'شراب'],
+    defaultFrequency: 'قرص صباحاً ومساءً لمدة 3 أيام',
+    defaultTiming: 'after_meal'
+  },
+  {
+    id: 'eg-med-90',
+    name: 'Motinorm',
+    nameAr: 'موتينورم',
+    generic: 'Domperidone',
+    category: 'Antiemetic',
+    categoryAr: 'منظم للمعدة ومانع للقيء والغثيان',
+    defaultDosage: '10mg',
+    dosages: ['10mg', 'شراب'],
+    defaultFrequency: 'قرص قبل الأكل بـ 15 دقيقة',
+    defaultTiming: 'before_meal'
+  },
+  {
+    id: 'eg-med-91',
+    name: 'Cipralex',
+    nameAr: 'سيبرالكس',
+    generic: 'Escitalopram',
+    category: 'SSRI Antidepressant',
+    categoryAr: 'علاج القلق والاكتئاب والهلع ونوبات التوتر والوسواس',
+    defaultDosage: '10mg',
+    dosages: ['10mg', '20mg'],
+    defaultFrequency: 'قرص واحد يومياً في نفس الموعد صباحاً أو مساءً',
+    defaultTiming: 'after_meal'
+  },
+  {
+    id: 'eg-med-92',
+    name: 'Deanxit',
+    nameAr: 'ديانكسيت',
+    generic: 'Flupentixol + Melitracen',
+    category: 'Anxiolytic',
+    categoryAr: 'علاج القلق والتوتر العصبي والقولون العصبي النفسي',
+    defaultDosage: 'Sugar-Coated Tablet',
+    dosages: ['أقراص مغلفة'],
+    defaultFrequency: 'قرص صباحاً وظهراً قبل الأكل',
+    defaultTiming: 'before_meal'
+  },
+  {
+    id: 'eg-med-93',
+    name: 'Doliprane',
+    nameAr: 'دوليبران',
+    generic: 'Paracetamol 1000mg (1g)',
+    category: 'Analgesic',
+    categoryAr: 'مسكن قوي وخافض حرارة تركيز 1000 ملجم',
+    defaultDosage: '1000mg',
+    dosages: ['1000mg أقراص', '500mg', 'أكياس فوارة'],
+    defaultFrequency: 'قرص كل 8 ساعات بعد الأكل عند اللزوم',
+    defaultTiming: 'after_meal'
+  },
+  {
+    id: 'eg-med-94',
+    name: 'Novaldol',
+    nameAr: 'نوفالدول 1000',
+    generic: 'Paracetamol 1000mg',
+    category: 'Analgesic',
+    categoryAr: 'مسكن آمن للصداع وآلام الجسم تركيز 1 جرام',
+    defaultDosage: '1000mg',
+    dosages: ['1000mg أقراص'],
+    defaultFrequency: 'قرص عند اللزوم كل 6 إلى 8 ساعات',
+    defaultTiming: 'after_meal'
+  },
+  {
+    id: 'eg-med-95',
+    name: 'Movalis',
+    nameAr: 'موفاليس',
+    generic: 'Meloxicam',
+    category: 'NSAID',
+    categoryAr: 'مسكن لالتهاب المفاصل والروماتويد والفقرات',
+    defaultDosage: '15mg',
+    dosages: ['15mg', '7.5mg', '15mg أمبولات عضل'],
+    defaultFrequency: 'قرص واحد يومياً بعد وجبة الغداء',
+    defaultTiming: 'after_meal'
+  },
+  {
+    id: 'eg-med-96',
+    name: 'Arcoxia',
+    nameAr: 'أركوكسيا',
+    generic: 'Etoricoxib',
+    category: 'COX-2 Selective NSAID',
+    categoryAr: 'مسكن سريع ومضاد للالتهاب لآلام النقرس والمفاصل والأسنان',
+    defaultDosage: '90mg',
+    dosages: ['60mg', '90mg', '120mg'],
+    defaultFrequency: 'قرص واحد يومياً بعد الأكل',
+    defaultTiming: 'after_meal'
+  },
+  {
+    id: 'eg-med-97',
+    name: 'Xefo',
+    nameAr: 'زيفو',
+    generic: 'Lornoxicam',
+    category: 'Potent NSAID',
+    categoryAr: 'مسكن قوي لآلام العمود الفقري وجراحات العظام والأسنان',
+    defaultDosage: '8mg',
+    dosages: ['8mg أقراص', '8mg حقن عضل/وريد'],
+    defaultFrequency: 'قرص كل 12 ساعة بعد الأكل',
+    defaultTiming: 'after_meal'
+  },
+  {
+    id: 'eg-med-98',
+    name: 'Mucosolvan',
+    nameAr: 'ميوكوسولفان',
+    generic: 'Ambroxol',
+    category: 'Mucolytic',
+    categoryAr: 'مذيب للبلغم وتحسين التنفس',
+    defaultDosage: '30mg / 15mg',
+    dosages: ['شراب', 'أقراص 30mg', 'نقط'],
+    defaultFrequency: 'ملعقة كبيرة 3 مرات يومياً بعد الأكل',
+    defaultTiming: 'after_meal'
+  },
+  {
+    id: 'eg-med-99',
+    name: 'Bisolvon',
+    nameAr: 'بيسولفون',
+    generic: 'Bromhexine HCl',
+    category: 'Mucolytic',
+    categoryAr: 'طارد ومذيب للإفرازات المخاطية التنفسية',
+    defaultDosage: '8mg Tablet / Syrup',
+    dosages: ['أقراص 8mg', 'شراب 4mg/5ml', 'نقط'],
+    defaultFrequency: 'قرص 3 مرات يومياً',
+    defaultTiming: 'after_meal'
+  },
+  {
+    id: 'eg-med-100',
+    name: 'Claritine',
+    nameAr: 'كلاريتين',
+    generic: 'Loratadine',
+    category: 'Antihistamine',
+    categoryAr: 'مضاد للحساسية والرشح لا يسبب النعاس',
+    defaultDosage: '10mg',
+    dosages: ['10mg أقراص', 'شراب'],
+    defaultFrequency: 'قرص واحد يومياً صباحاً',
+    defaultTiming: 'anytime'
   }
 ];
 
 /**
  * Fast search helper for autocomplete matching both English and Arabic
  */
-export function searchEgyptianMedications(query: string, limit: number = 8): EgyptianMedication[] {
-  const q = (query || '').trim().toLowerCase();
+export function searchEgyptianMedications(query: string, limit: number = 15): EgyptianMedication[] {
+  const q = (query || '').trim();
   if (!q || q.length < 1) return [];
 
-  // Normalize Arabic letters
-  const normalize = (str: string) =>
+  // Normalize Arabic letters and remove diacritics
+  const normalize = (str: string): string =>
     str
       .toLowerCase()
       .replace(/[أإآ]/g, 'ا')
       .replace(/ى/g, 'ي')
       .replace(/ة/g, 'ه')
-      .replace(/[\u064B-\u065F]/g, '');
+      .replace(/ؤ/g, 'و')
+      .replace(/ئ/g, 'ي')
+      .replace(/[\u064B-\u065F\u0640]/g, '') // Remove tashkeel and tatweel
+      .replace(/[-_]/g, ' ')
+      .trim();
 
   const normQ = normalize(q);
+  const qWords = normQ.split(/\s+/).filter(Boolean);
 
-  return EGYPTIAN_MEDICATIONS.filter((med) => {
+  const matched = EGYPTIAN_MEDICATIONS.filter((med) => {
     const normName = normalize(med.name);
     const normAr = normalize(med.nameAr);
     const normGeneric = normalize(med.generic);
     const normCat = normalize(med.categoryAr + ' ' + med.category);
+    const combined = `${normName} ${normAr} ${normGeneric} ${normCat}`;
 
-    return (
-      normName.includes(normQ) ||
-      normAr.includes(normQ) ||
-      normGeneric.includes(normQ) ||
-      normCat.includes(normQ)
-    );
+    // Direct match on commercial or Arabic name or generic
+    if (normName.includes(normQ) || normAr.includes(normQ) || normGeneric.includes(normQ)) {
+      return true;
+    }
+
+    // Multi-word matching
+    return qWords.length > 0 && qWords.every((word) => combined.includes(word));
+  });
+
+  // Sort: exact/prefix matches first
+  return matched.sort((a, b) => {
+    const aStarts = normalize(a.name).startsWith(normQ) || normalize(a.nameAr).startsWith(normQ);
+    const bStarts = normalize(b.name).startsWith(normQ) || normalize(b.nameAr).startsWith(normQ);
+    if (aStarts && !bStarts) return -1;
+    if (!aStarts && bStarts) return 1;
+    return 0;
   }).slice(0, limit);
 }

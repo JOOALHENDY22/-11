@@ -27,11 +27,19 @@ export const EgyptianMedicationInput: React.FC<EgyptianMedicationInputProps> = (
 
   useEffect(() => {
     if (value && value.trim().length >= 1) {
-      const results = searchEgyptianMedications(value, 6);
+      const results = searchEgyptianMedications(value, 12);
       setSuggestions(results);
-      setAiResults([]);
-      setIsOpen(results.length > 0 || value.trim().length >= 2);
+      setIsOpen(true);
       setHighlightedIndex(-1);
+
+      // If search query is 2+ chars and results are fewer than 3, auto-trigger live AI lookup with debounce
+      const timer = setTimeout(() => {
+        if (value.trim().length >= 2 && results.length < 5) {
+          handleLiveAiSearch();
+        }
+      }, 500);
+
+      return () => clearTimeout(timer);
     } else {
       setSuggestions([]);
       setAiResults([]);
@@ -61,7 +69,7 @@ export const EgyptianMedicationInput: React.FC<EgyptianMedicationInputProps> = (
           nameAr: d.nameAr || d.name || '',
           generic: d.generic || '',
           category: d.category || 'general',
-          categoryAr: d.categoryAr || 'دواء عام',
+          categoryAr: d.categoryAr || 'دواء متداول',
           defaultDosage: d.defaultDosage || 'قرص واحد',
           dosages: [d.defaultDosage || 'قرص واحد'],
           defaultFrequency: d.defaultFrequency || 'مرتين يومياً',
@@ -113,7 +121,7 @@ export const EgyptianMedicationInput: React.FC<EgyptianMedicationInputProps> = (
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => {
             if (value && value.trim().length >= 1) {
-              const results = searchEgyptianMedications(value, 6);
+              const results = searchEgyptianMedications(value, 12);
               setSuggestions(results);
               setIsOpen(true);
             }
@@ -129,12 +137,12 @@ export const EgyptianMedicationInput: React.FC<EgyptianMedicationInputProps> = (
         )}
       </div>
 
-      {isOpen && (suggestions.length > 0 || value.trim().length >= 2) && (
+      {isOpen && (suggestions.length > 0 || aiResults.length > 0 || value.trim().length >= 2) && (
         <div className="absolute z-50 left-0 right-0 top-full mt-1.5 bg-white dark:bg-slate-900 border border-teal-500/30 rounded-2xl shadow-xl overflow-hidden animate-slide-up text-start max-h-72 overflow-y-auto">
           <div className="px-3 py-1.5 bg-teal-50 dark:bg-teal-950/40 border-b border-teal-100 dark:border-teal-900/60 flex items-center justify-between text-[10px] font-bold text-teal-800 dark:text-teal-300">
             <span className="flex items-center gap-1">
               <Pill className="w-3 h-3 text-teal-600" />
-              <span>اقتراحات الأدوية المصرية:</span>
+              <span>دليل الأدوية المصرية:</span>
             </span>
             <span className="text-[9px] font-normal text-slate-400">اختر للتعبئة التلقائية للجرعة والتوقيت</span>
           </div>
@@ -195,7 +203,7 @@ export const EgyptianMedicationInput: React.FC<EgyptianMedicationInputProps> = (
                       <span className="font-bold text-xs text-slate-900 dark:text-white">{med.name}</span>
                       <span className="text-xs font-semibold text-teal-700 dark:text-teal-400">({med.nameAr})</span>
                       <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-teal-600/15 text-teal-700 dark:text-teal-300 font-bold">
-                        Gemini AI
+                        اقتراح ذكي
                       </span>
                     </div>
                     <div className="text-[10px] text-slate-400 truncate">
@@ -215,23 +223,23 @@ export const EgyptianMedicationInput: React.FC<EgyptianMedicationInputProps> = (
           {/* AI Search Action */}
           <div className="p-2 bg-slate-50 dark:bg-slate-850 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
             <span className="text-[10px] text-slate-400">
-              {suggestions.length === 0 ? 'لم يتم العثور على الدواء بالقائمة المحلية' : 'هل تبحث عن صنف آخر؟'}
+              {suggestions.length === 0 ? 'لم يتم العثور على الدواء بالقائمة المباشرة' : 'هل تبحث عن صنف آخر؟'}
             </span>
             <button
               type="button"
               onClick={handleLiveAiSearch}
               disabled={aiLoading}
-              className="px-2.5 py-1 rounded-lg bg-teal-600/10 hover:bg-teal-600/20 text-teal-700 dark:text-teal-300 font-bold text-[10px] border border-teal-600/20 flex items-center gap-1 transition-all"
+              className="px-2.5 py-1 rounded-lg bg-teal-600/10 hover:bg-teal-600/20 text-teal-700 dark:text-teal-300 font-bold text-[10px] border border-teal-600/20 flex items-center gap-1 transition-all cursor-pointer"
             >
               {aiLoading ? (
                 <>
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>جارٍ البحث بالذكاء الاصطناعي...</span>
+                  <span>جارٍ البحث في قاعدة الأدوية...</span>
                 </>
               ) : (
                 <>
                   <Sparkles className="w-3 h-3 text-teal-500" />
-                  <span>بحث في الصيدليات المصرية بالذكاء الاصطناعي</span>
+                  <span>بحث متقدم بالذكاء الاصطناعي</span>
                 </>
               )}
             </button>
