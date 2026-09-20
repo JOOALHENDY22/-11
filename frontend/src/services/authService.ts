@@ -330,16 +330,30 @@ export class AuthService {
             };
           }
 
-          const salt = cleanEmail;
+          const salt = profile.salt || cleanEmail;
           const passwordHash = await hashPassword(cleanPass, salt);
+
+          if (profile.password_hash && !isSuperAdminAccount) {
+            if (profile.password_hash !== passwordHash) {
+              const lockStatus = SecurityRateLimiter.recordFailedAttempt(`login_${cleanEmail}`, 5, 120);
+              if (lockStatus.isLockedNow) {
+                return {
+                  success: false,
+                  error: `تم قفل الحساب مؤقتاً لمدة ${lockStatus.remainingSeconds} ثانية لتكرار إدخال كلمة المرور بشكل خاطئ.`
+                };
+              }
+              return { success: false, error: 'كلمة المرور غير صحيحة. يرجى إعادة المحاولة.' };
+            }
+          }
+
           vault[cleanEmail] = {
             fullName: profile.full_name,
             email: cleanEmail,
             role: (profile.role as UserRole) || activeRole,
             status: userStatus,
-            passwordHash,
+            passwordHash: profile.password_hash || passwordHash,
             salt,
-            createdAt: new Date().toISOString()
+            createdAt: profile.created_at || new Date().toISOString()
           };
           this.saveUsersVault(vault);
 

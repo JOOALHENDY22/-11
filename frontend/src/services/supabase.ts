@@ -35,9 +35,7 @@ class SupabaseService {
     return !!(
       this.url && 
       this.anonKey && 
-      this.url.startsWith('https://') && 
-      this.url.includes('.supabase.co') &&
-      !this.url.includes('saferx-health-portal.supabase.co')
+      this.url.startsWith('https://')
     );
   }
 

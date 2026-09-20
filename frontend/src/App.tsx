@@ -67,9 +67,7 @@ const SUPABASE_ANON_KEY = (storedKey || metaEnv.VITE_SUPABASE_ANON_KEY || '').tr
 const isRealSupabase = Boolean(
   SUPABASE_URL && 
   SUPABASE_ANON_KEY && 
-  SUPABASE_URL.startsWith('https://') && 
-  SUPABASE_URL.includes('.supabase.co') &&
-  !SUPABASE_URL.includes('saferx-health-portal.supabase.co')
+  SUPABASE_URL.startsWith('https://')
 );
 
 let supabaseClient: SupabaseClient | null = null;
