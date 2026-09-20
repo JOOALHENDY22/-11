@@ -53,9 +53,12 @@ import { AdminDashboard } from './components/admin/AdminDashboard';
 // 1. SUPABASE CLIENT & BACKEND CONFIGURATION
 // ==========================================
 const metaEnv = (import.meta as any).env || {};
-const RAW_URL = metaEnv.VITE_SUPABASE_URL || '';
-const SUPABASE_URL = RAW_URL.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
-const SUPABASE_ANON_KEY = (metaEnv.VITE_SUPABASE_ANON_KEY || '').trim();
+const storedUrl = typeof localStorage !== 'undefined' ? (localStorage.getItem('saferx_supabase_url') || '') : '';
+const storedKey = typeof localStorage !== 'undefined' ? (localStorage.getItem('saferx_supabase_anon_key') || '') : '';
+
+const RAW_URL = storedUrl || metaEnv.VITE_SUPABASE_URL || '';
+const SUPABASE_URL = RAW_URL.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '').trim();
+const SUPABASE_ANON_KEY = (storedKey || metaEnv.VITE_SUPABASE_ANON_KEY || '').trim();
 
 const isRealSupabase = Boolean(
   SUPABASE_URL && 

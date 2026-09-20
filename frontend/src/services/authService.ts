@@ -137,18 +137,38 @@ export class AuthService {
     // Save to Supabase if connected
     if (supabase) {
       try {
-        await supabase.from('profiles').upsert({
+        const { error: upsertErr } = await supabase.from('profiles').upsert({
           email: cleanEmail,
           full_name: cleanName,
           role: role,
-          status: initialStatus
+          status: initialStatus,
+          password_hash: passwordHash,
+          salt: salt,
+          created_at: new Date().toISOString()
         }, { onConflict: 'email' });
 
-        supabase.auth.signUp({
-          email: cleanEmail,
-          password: cleanPass,
-          options: { data: { full_name: cleanName, role: role, status: initialStatus } }
-        }).catch(err => console.warn('[Supabase Auth Background]', err));
+        if (upsertErr) {
+          console.warn('[Supabase Profile Upsert Error]', upsertErr);
+        }
+
+        // Record registration in security audit logs
+        try {
+          await supabase.from('security_audit_logs').insert({
+            action: 'USER_REGISTERED',
+            performed_by: cleanEmail,
+            target_email: cleanEmail,
+            target_role: role,
+            details: { status: initialStatus, fullName: cleanName }
+          });
+        } catch {}
+
+        try {
+          supabase.auth.signUp({
+            email: cleanEmail,
+            password: cleanPass,
+            options: { data: { full_name: cleanName, role: role, status: initialStatus } }
+          });
+        } catch {}
       } catch (err) {
         console.warn('[Supabase Profile Upsert]', err);
       }
@@ -328,7 +348,49 @@ export class AuthService {
   // ==========================================
 
   /**
-   * Get all registered users from vault.
+   * Synchronize & fetch all registered users from Supabase and local vault.
+   */
+  public static async fetchAllUsers(supabase?: SupabaseClient | null): Promise<StoredUserAccount[]> {
+    const vault = this.getUsersVault();
+
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!error && data && data.length > 0) {
+          data.forEach((p: any) => {
+            const email = (p.email || '').trim().toLowerCase();
+            if (!email) return;
+
+            const existing = vault[email];
+            vault[email] = {
+              fullName: p.full_name || existing?.fullName || email,
+              email: email,
+              role: (p.role as UserRole) || existing?.role || 'patient',
+              status: (p.status as UserStatus) || existing?.status || (p.role === 'patient' ? 'approved' : 'pending'),
+              passwordHash: p.password_hash || existing?.passwordHash || '',
+              salt: p.salt || existing?.salt || email,
+              createdAt: p.created_at || existing?.createdAt || new Date().toISOString(),
+              approvedAt: p.approved_at || existing?.approvedAt,
+              suspendedAt: p.suspended_at || existing?.suspendedAt
+            };
+          });
+
+          this.saveUsersVault(vault);
+        }
+      } catch (err) {
+        console.warn('[AuthService fetchAllUsers Supabase Error]', err);
+      }
+    }
+
+    return Object.values(vault).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  /**
+   * Get cached registered users from local vault synchronously.
    */
   public static getAllUsers(): StoredUserAccount[] {
     const vault = this.getUsersVault();
@@ -338,70 +400,145 @@ export class AuthService {
   /**
    * Approve a pending doctor or pharmacist account.
    */
-  public static approveUser(email: string, supabase?: SupabaseClient | null): boolean {
+  public static async approveUser(email: string, supabase?: SupabaseClient | null): Promise<boolean> {
     const vault = this.getUsersVault();
     const cleanEmail = email.trim().toLowerCase();
-    if (vault[cleanEmail]) {
-      vault[cleanEmail].status = 'approved';
-      vault[cleanEmail].approvedAt = new Date().toISOString();
-      this.saveUsersVault(vault);
+    const nowIso = new Date().toISOString();
 
-      if (supabase) {
-        supabase.from('profiles').update({ status: 'approved' }).eq('email', cleanEmail).then(() => {}, console.warn);
-      }
-      return true;
+    if (!vault[cleanEmail]) {
+      vault[cleanEmail] = {
+        fullName: cleanEmail,
+        email: cleanEmail,
+        role: 'doctor',
+        status: 'approved',
+        passwordHash: '',
+        salt: cleanEmail,
+        createdAt: nowIso
+      };
     }
-    return false;
+
+    vault[cleanEmail].status = 'approved';
+    vault[cleanEmail].approvedAt = nowIso;
+    this.saveUsersVault(vault);
+
+    if (supabase) {
+      try {
+        await supabase.from('profiles').update({
+          status: 'approved',
+          approved_at: nowIso,
+          approved_by: 'SuperAdmin'
+        }).ilike('email', cleanEmail);
+
+        try {
+          await supabase.from('security_audit_logs').insert({
+            action: 'USER_APPROVED',
+            performed_by: 'SuperAdmin',
+            target_email: cleanEmail,
+            target_role: vault[cleanEmail].role,
+            details: { approvedAt: nowIso }
+          });
+        } catch {}
+      } catch (err) {
+        console.warn('[Supabase Approve User Error]', err);
+      }
+    }
+    return true;
   }
 
   /**
    * Suspend/Freeze an active user account.
    */
-  public static suspendUser(email: string, supabase?: SupabaseClient | null): boolean {
+  public static async suspendUser(email: string, supabase?: SupabaseClient | null): Promise<boolean> {
     const vault = this.getUsersVault();
     const cleanEmail = email.trim().toLowerCase();
-    if (vault[cleanEmail] && vault[cleanEmail].role !== 'admin') {
-      vault[cleanEmail].status = 'suspended';
-      vault[cleanEmail].suspendedAt = new Date().toISOString();
-      this.saveUsersVault(vault);
+    const nowIso = new Date().toISOString();
 
-      // If suspended user is currently logged in, clear their session
-      const currentSession = this.getCurrentSession();
-      if (currentSession && currentSession.email === cleanEmail) {
-        this.setCurrentSession(null);
-      }
+    if (cleanEmail === SUPERADMIN_EMAIL) return false;
 
-      if (supabase) {
-        supabase.from('profiles').update({ status: 'suspended' }).eq('email', cleanEmail).then(() => {}, console.warn);
-      }
-      return true;
+    if (!vault[cleanEmail]) {
+      vault[cleanEmail] = {
+        fullName: cleanEmail,
+        email: cleanEmail,
+        role: 'doctor',
+        status: 'suspended',
+        passwordHash: '',
+        salt: cleanEmail,
+        createdAt: nowIso
+      };
     }
-    return false;
+
+    vault[cleanEmail].status = 'suspended';
+    vault[cleanEmail].suspendedAt = nowIso;
+    this.saveUsersVault(vault);
+
+    // If suspended user is currently logged in, clear their session
+    const currentSession = this.getCurrentSession();
+    if (currentSession && currentSession.email === cleanEmail) {
+      this.setCurrentSession(null);
+    }
+
+    if (supabase) {
+      try {
+        await supabase.from('profiles').update({
+          status: 'suspended',
+          suspended_at: nowIso,
+          suspended_by: 'SuperAdmin'
+        }).ilike('email', cleanEmail);
+
+        try {
+          await supabase.from('security_audit_logs').insert({
+            action: 'USER_SUSPENDED',
+            performed_by: 'SuperAdmin',
+            target_email: cleanEmail,
+            target_role: vault[cleanEmail].role,
+            details: { suspendedAt: nowIso }
+          });
+        } catch {}
+      } catch (err) {
+        console.warn('[Supabase Suspend User Error]', err);
+      }
+    }
+    return true;
   }
 
   /**
    * Unsuspend / Reactivate a user account.
    */
-  public static unsuspendUser(email: string, supabase?: SupabaseClient | null): boolean {
+  public static async unsuspendUser(email: string, supabase?: SupabaseClient | null): Promise<boolean> {
     return this.approveUser(email, supabase);
   }
 
   /**
-   * Delete a user account from vault.
+   * Delete a user account from vault and database.
    */
-  public static deleteUser(email: string, supabase?: SupabaseClient | null): boolean {
+  public static async deleteUser(email: string, supabase?: SupabaseClient | null): Promise<boolean> {
     const vault = this.getUsersVault();
     const cleanEmail = email.trim().toLowerCase();
-    if (vault[cleanEmail] && vault[cleanEmail].role !== 'admin') {
+
+    if (cleanEmail === SUPERADMIN_EMAIL) return false;
+
+    if (vault[cleanEmail]) {
       delete vault[cleanEmail];
       this.saveUsersVault(vault);
-
-      if (supabase) {
-        supabase.from('profiles').delete().eq('email', cleanEmail).then(() => {}, console.warn);
-      }
-      return true;
     }
-    return false;
+
+    if (supabase) {
+      try {
+        await supabase.from('profiles').delete().ilike('email', cleanEmail);
+
+        try {
+          await supabase.from('security_audit_logs').insert({
+            action: 'USER_DELETED',
+            performed_by: 'SuperAdmin',
+            target_email: cleanEmail,
+            details: { deletedAt: new Date().toISOString() }
+          });
+        } catch {}
+      } catch (err) {
+        console.warn('[Supabase Delete User Error]', err);
+      }
+    }
+    return true;
   }
 
   public static getCurrentSession(): UserSession | null {

@@ -68,16 +68,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'suspended' | 'doctor' | 'pharmacist' | 'patient'>('all');
   const [actionSuccessMsg, setActionSuccessMsg] = useState('');
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
-  // Load all users
-  const refreshUsers = () => {
-    const list = AuthService.getAllUsers();
-    setUsers(list);
+  // Load all users from Supabase and local vault
+  const refreshUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const list = await AuthService.fetchAllUsers(supabaseClient);
+      setUsers(list);
+    } catch (e) {
+      console.warn('[Admin refreshUsers]', e);
+    } finally {
+      setLoadingUsers(false);
+    }
   };
 
   useEffect(() => {
     refreshUsers();
-  }, [currentUser]);
+
+    if (!supabaseClient) return;
+
+    try {
+      const channel = supabaseClient
+        .channel('admin-profiles-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+          refreshUsers();
+        })
+        .subscribe();
+
+      return () => {
+        supabaseClient.removeChannel(channel);
+      };
+    } catch (err) {
+      console.warn('[Admin Realtime Subscribe Error]', err);
+    }
+  }, [currentUser, supabaseClient]);
 
   const showNotification = (msg: string) => {
     setActionSuccessMsg(msg);
@@ -96,7 +121,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         setAuthError(language === 'ar' ? 'هذا الحساب ليس لديه صلاحيات الإدارة.' : 'This account does not have Admin privileges.');
       } else {
         onAdminLogin(result.user);
-        refreshUsers();
+        await refreshUsers();
       }
     } else {
       setAuthError(result.error || (language === 'ar' ? 'فشل تسجيل دخول المسؤول' : 'Admin Login Failed'));
@@ -106,42 +131,46 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // Admin Actions
-  const handleApprove = (email: string, role: UserRole) => {
+  const handleApprove = async (email: string, role: UserRole) => {
     const roleName = role === 'doctor' ? (language === 'ar' ? 'الطبيب' : 'Doctor') : (language === 'ar' ? 'الصيدلي' : 'Pharmacist');
-    if (AuthService.approveUser(email, supabaseClient)) {
-      refreshUsers();
+    const ok = await AuthService.approveUser(email, supabaseClient);
+    if (ok) {
+      await refreshUsers();
       showNotification(language === 'ar' ? `تم اعتماد وتفعيل حساب ${roleName} (${email}) بنجاح! ✅` : `Account ${email} approved successfully! ✅`);
     }
   };
 
-  const handleSuspend = (email: string) => {
+  const handleSuspend = async (email: string) => {
     if (email === 'jooalhendy@gmail.com') {
       alert(language === 'ar' ? 'لا يمكن إيقاف حساب المشرف العام الرئيسي.' : 'Cannot suspend primary SuperAdmin account.');
       return;
     }
     if (window.confirm(language === 'ar' ? `هل أنت متأكد من إيقاف حساب (${email})؟ لن يتمكن من الدخول للمنظومة.` : `Are you sure you want to suspend account (${email})?`)) {
-      if (AuthService.suspendUser(email, supabaseClient)) {
-        refreshUsers();
+      const ok = await AuthService.suspendUser(email, supabaseClient);
+      if (ok) {
+        await refreshUsers();
         showNotification(language === 'ar' ? `تم إيقاف حساب (${email}) فورياً. ⛔` : `Account (${email}) suspended immediately. ⛔`);
       }
     }
   };
 
-  const handleUnsuspend = (email: string) => {
-    if (AuthService.unsuspendUser(email, supabaseClient)) {
-      refreshUsers();
+  const handleUnsuspend = async (email: string) => {
+    const ok = await AuthService.unsuspendUser(email, supabaseClient);
+    if (ok) {
+      await refreshUsers();
       showNotification(language === 'ar' ? `تم إلغاء إيقاف الحساب (${email}) وإعادة تفعيله. 🔄` : `Account (${email}) reactivated successfully. 🔄`);
     }
   };
 
-  const handleDelete = (email: string) => {
+  const handleDelete = async (email: string) => {
     if (email === 'jooalhendy@gmail.com') {
       alert(language === 'ar' ? 'لا يمكن حذف حساب المشرف العام الرئيسي.' : 'Cannot delete primary SuperAdmin account.');
       return;
     }
     if (window.confirm(language === 'ar' ? `⚠️ تحذير: هل أنت متأكد من حذف الحساب (${email}) نهائياً؟ لا يمكن التراجع عن هذا الإجراء.` : `⚠️ Warning: Permanently delete account (${email})?`)) {
-      if (AuthService.deleteUser(email, supabaseClient)) {
-        refreshUsers();
+      const ok = await AuthService.deleteUser(email, supabaseClient);
+      if (ok) {
+        await refreshUsers();
         showNotification(language === 'ar' ? `تم حذف الحساب (${email}) نهائياً من المنظومة.` : `Account (${email}) deleted.`);
       }
     }
@@ -540,16 +569,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </button>
               </div>
 
-              {/* Search Input */}
-              <div className="relative w-full sm:w-64 shrink-0">
-                <Search className="w-4 h-4 text-slate-400 absolute start-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={language === 'ar' ? 'بحث بالاسم أو البريد...' : 'Search by name or email...'}
-                  className="w-full ps-9 pe-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
-                />
+              {/* Search & Refresh Controls */}
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="relative w-full sm:w-64 shrink-0">
+                  <Search className="w-4 h-4 text-slate-400 absolute start-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={language === 'ar' ? 'بحث بالاسم أو البريد...' : 'Search by name or email...'}
+                    className="w-full ps-9 pe-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={refreshUsers}
+                  disabled={loadingUsers}
+                  className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 shrink-0 shadow-xs"
+                  title={language === 'ar' ? 'تحديث البيانات من السيرفر' : 'Refresh database'}
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingUsers ? 'animate-spin text-rose-600' : 'text-slate-500'}`} />
+                  <span className="hidden sm:inline text-xs font-semibold">{language === 'ar' ? 'تحديث' : 'Refresh'}</span>
+                </button>
               </div>
             </div>
           </div>
