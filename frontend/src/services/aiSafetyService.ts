@@ -35,7 +35,22 @@ const STORAGE_KEY_AI = 'saferx_ai_api_key';
 export class AiSafetyService {
   public static getApiKey(): string {
     const metaEnv = (import.meta as any).env || {};
-    return localStorage.getItem(STORAGE_KEY_AI) || metaEnv.VITE_AI_API_KEY || DEFAULT_AI_KEY;
+    return (
+      localStorage.getItem(STORAGE_KEY_AI) ||
+      metaEnv.VITE_AI_API_KEY ||
+      metaEnv.VITE_OPENAI_API_KEY ||
+      DEFAULT_AI_KEY
+    );
+  }
+
+  public static getBaseUrl(): string {
+    const metaEnv = (import.meta as any).env || {};
+    return (
+      localStorage.getItem('saferx_ai_base_url') ||
+      metaEnv.VITE_AI_BASE_URL ||
+      metaEnv.VITE_OPENAI_BASE_URL ||
+      'https://api.openai.com/v1'
+    );
   }
 
   public static setApiKey(key: string): void {
@@ -103,7 +118,8 @@ Respond ONLY with valid JSON (no markdown formatting, no code fences, no extra t
 Note: "status" must be one of: "safe" | "caution" | "critical".
 `;
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const baseUrl = this.getBaseUrl().replace(/\/+$/, '');
+      const response = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
