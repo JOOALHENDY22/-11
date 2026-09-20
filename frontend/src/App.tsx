@@ -48,6 +48,7 @@ import { PrescriptionService } from './services/prescriptionService';
 import { SecurityRateLimiter, sanitizeInput, sanitizeAlphaNumeric, generatePrescriptionUrl, verifyQRData } from './utils/security';
 import { translations, Language } from './utils/translations';
 import { AdminDashboard } from './components/admin/AdminDashboard';
+import { AiSafetyVerificationCard } from './components/pharmacist/AiSafetyVerificationCard';
 
 // ==========================================
 // 1. SUPABASE CLIENT & BACKEND CONFIGURATION
@@ -1358,6 +1359,9 @@ const PharmacistStation: React.FC<{
               ))}
             </div>
           </div>
+
+          {/* AI Clinical Safety & Drug Interaction Verification */}
+          <AiSafetyVerificationCard prescription={searchedRx} language={language} />
 
           {/* Dispense action */}
           {searchedRx.status !== 'dispensed' ? (

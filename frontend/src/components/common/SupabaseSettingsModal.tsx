@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { supabaseService } from '../../services/supabase';
-import { Database, Check, AlertCircle, ExternalLink, Key, ShieldCheck } from 'lucide-react';
+import { AiSafetyService } from '../../services/aiSafetyService';
+import { Database, Check, AlertCircle, ExternalLink, Key, ShieldCheck, Sparkles } from 'lucide-react';
 
 interface SupabaseSettingsModalProps {
   isOpen: boolean;
@@ -15,24 +16,27 @@ export const SupabaseSettingsModal: React.FC<SupabaseSettingsModalProps> = ({
   const currentConfig = supabaseService.getConfig();
   const [url, setUrl] = useState(currentConfig.url);
   const [anonKey, setAnonKey] = useState(currentConfig.anonKey);
+  const [aiApiKey, setAiApiKey] = useState(AiSafetyService.getApiKey());
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url || !anonKey) {
-      setStatusMessage({ text: 'يرجى إدخال كل من Project URL و Anon Public Key.', type: 'error' });
-      return;
+    if (aiApiKey) {
+      AiSafetyService.setApiKey(aiApiKey);
     }
 
-    const isOk = supabaseService.saveConfig(url, anonKey);
-    if (isOk) {
-      setStatusMessage({ text: 'تم الاتصال بقاعدة بيانات Supabase بنجاح! يتم الآن حفظ واسترجاع البيانات منها مباشرة.', type: 'success' });
-      setTimeout(() => {
-        onClose();
-      }, 1500);
-    } else {
-      setStatusMessage({ text: 'تعذر الاتصال، تأكد من صحة الرابط ومفتاح الـ Anon Key.', type: 'error' });
+    if (url && anonKey) {
+      const isOk = supabaseService.saveConfig(url, anonKey);
+      if (!isOk) {
+        setStatusMessage({ text: 'تعذر الاتصال، تأكد من صحة الرابط ومفتاح الـ Anon Key.', type: 'error' });
+        return;
+      }
     }
+
+    setStatusMessage({ text: 'تم حفظ إعدادات قاعدة البيانات ومفتاح الذكاء الاصطناعي بنجاح! 🚀', type: 'success' });
+    setTimeout(() => {
+      onClose();
+    }, 1200);
   };
 
   return (
@@ -109,10 +113,31 @@ export const SupabaseSettingsModal: React.FC<SupabaseSettingsModalProps> = ({
           </div>
         </div>
 
+        <div>
+          <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-medical-600" />
+              مفتاح الذكاء الاصطناعي (AI Safety Check API Key)
+            </span>
+            <span className="text-[10px] text-slate-400 font-normal">اختياري (مدمج تلقائياً)</span>
+          </label>
+          <div className="relative">
+            <Key className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="password"
+              value={aiApiKey}
+              onChange={(e) => setAiApiKey(e.target.value)}
+              placeholder="sk-apx..."
+              className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-medical-500 focus:outline-none"
+            />
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1">يُستخدم هذا المفتاح للتحقق التلقائي الذكي من التفاعلات الدوائية وموانع الاستعمال في خانة الصيدلي.</p>
+        </div>
+
         <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 flex items-start gap-2">
           <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
           <span>
-            يتم حفظ المفاتيح محلياً بأمان، وعند الحفظ سيتم توجيه جميع عمليات التسجيل وإضافة الروشتات وصرف الأدوية إلى قاعدة بياناتك السحابية مباشرة.
+            يتم حفظ المفاتيح محلياً بأمان، وعند الحفظ سيتم توجيه جميع عمليات التسجيل وإضافة الروشتات وفحص التفاعلات الدوائية بالذكاء الاصطناعي تلقائياً.
           </span>
         </div>
 
