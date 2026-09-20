@@ -49,6 +49,8 @@ import { SecurityRateLimiter, sanitizeInput, sanitizeAlphaNumeric, generatePresc
 import { translations, Language } from './utils/translations';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { AiSafetyVerificationCard } from './components/pharmacist/AiSafetyVerificationCard';
+import { EgyptianMedicationInput } from './components/doctor/EgyptianMedicationInput';
+import { EgyptianMedication } from './data/egyptianMedications';
 
 // ==========================================
 // 1. SUPABASE CLIENT & BACKEND CONFIGURATION
@@ -1866,6 +1868,20 @@ const CreateRxModalComponent: React.FC<{
     ]);
   };
 
+  const handleSelectEgyptianMed = (index: number, med: EgyptianMedication) => {
+    setMedications(prev => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        name: `${med.name} (${med.nameAr})`,
+        dosage: med.defaultDosage,
+        frequency: med.defaultFrequency || updated[index].frequency,
+        timing: med.defaultTiming || updated[index].timing
+      };
+      return updated;
+    });
+  };
+
   const handleUpdateMed = (index: number, field: keyof MedicationItem, value: any) => {
     setMedications(prev => {
       const updated = [...prev];
@@ -2029,27 +2045,25 @@ const CreateRxModalComponent: React.FC<{
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <input
-                      type="text"
-                      required
+                    <EgyptianMedicationInput
                       value={m.name}
-                      onChange={(e) => handleUpdateMed(idx, 'name', e.target.value)}
+                      onChange={(val) => handleUpdateMed(idx, 'name', val)}
+                      onSelectMedication={(med) => handleSelectEgyptianMed(idx, med)}
                       placeholder={t.modalMedNamePlaceholder}
-                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:outline-none"
                     />
                     <input
                       type="text"
                       value={m.dosage}
                       onChange={(e) => handleUpdateMed(idx, 'dosage', e.target.value)}
                       placeholder={t.modalMedDosagePlaceholder}
-                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                      className="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:outline-none"
                     />
                     <input
                       type="text"
                       value={m.frequency}
                       onChange={(e) => handleUpdateMed(idx, 'frequency', e.target.value)}
                       placeholder={t.modalMedFreqPlaceholder}
-                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                      className="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:outline-none"
                     />
                   </div>
 
