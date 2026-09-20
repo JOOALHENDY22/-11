@@ -57,19 +57,19 @@ export const AiSafetyVerificationCard: React.FC<AiSafetyVerificationCardProps> =
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-teal-600/15 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 border border-teal-500/20">
-              <Bot className="w-5 h-5" />
+              <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
               <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <span>{language === 'ar' ? 'فحص الأمان والتفاعلات الدوائية بالذكاء الاصطناعي' : 'AI Clinical Drug Safety Check'}</span>
+                <span>{language === 'ar' ? 'فحص سلامة الروشتة والتفاعلات الدوائية' : 'Prescription Clinical Safety Check'}</span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] bg-teal-500/20 text-teal-700 dark:text-teal-300 font-bold">
-                  {language === 'ar' ? 'GPT-4o Mini' : 'AI Pharmacology'}
+                  {language === 'ar' ? 'فحص فوري' : 'Live Check'}
                 </span>
               </h4>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 {language === 'ar' 
-                  ? 'تحليل ذكي فوري للتفاعلات بين الأدوية، توافق الجرعات، وتعارض حساسية المريض.' 
-                  : 'Instant AI clinical screening for Drug-Drug interactions, contraindications and allergies.'}
+                  ? 'التحقق السريري من التفاعلات بين الأدوية، توافق الجرعات، وتعارض حساسية المريض.' 
+                  : 'Clinical screening for Drug-Drug interactions, contraindications and allergies.'}
               </p>
             </div>
           </div>
@@ -79,8 +79,8 @@ export const AiSafetyVerificationCard: React.FC<AiSafetyVerificationCardProps> =
             onClick={runAnalysis}
             className="group relative px-6 py-3 rounded-2xl bg-gradient-to-r from-teal-600 via-teal-500 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-bold text-xs shadow-md shadow-teal-600/25 hover:shadow-lg hover:shadow-teal-600/35 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-98 shrink-0"
           >
-            <Sparkles className="w-4 h-4 text-teal-200 group-hover:rotate-12 transition-transform" />
-            <span>{language === 'ar' ? 'فحص الروشتة بالذكاء الاصطناعي الآن' : 'Run AI Safety Check'}</span>
+            <ShieldCheck className="w-4 h-4 text-teal-200" />
+            <span>{language === 'ar' ? 'فحص الروشتة للتأكد من سلامتها' : 'Check Prescription Safety'}</span>
           </button>
         </div>
       </div>
@@ -96,7 +96,7 @@ export const AiSafetyVerificationCard: React.FC<AiSafetyVerificationCardProps> =
           </div>
           <div>
             <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-              {language === 'ar' ? 'جارٍ تحليل الروشتة بواسطة الذكاء الاصطناعي الإكلينيكي...' : 'AI Clinical Analysis in progress...'}
+              {language === 'ar' ? 'جارٍ فحص الروشتة للتأكد من سلامتها وتوافق الأدوية...' : 'Checking prescription safety and compatibility...'}
             </h4>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               {language === 'ar' ? 'مطابقة الأدوية الموصوفة مع قواعد التفاعلات وموانع الاستعمال الدوائية.' : 'Screening pharmacology database and patient medical records.'}
@@ -141,18 +141,16 @@ export const AiSafetyVerificationCard: React.FC<AiSafetyVerificationCardProps> =
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">
-                {language === 'ar' ? 'نتيجة فحص الأمان والتفاعلات الدوائية' : 'AI Safety & Interaction Report'}
+                {language === 'ar' ? 'نتيجة فحص سلامة الروشتة والتفاعلات الدوائية' : 'Prescription Safety & Interaction Report'}
               </h3>
               <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${badgeBg}`}>
                 {report.statusLabel}
               </span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1.5">
-              <Sparkles className="w-3 h-3 text-teal-600" />
+              <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
               <span>
-                {report.isAiGenerated 
-                  ? (language === 'ar' ? 'تم الفحص المباشر بمحرك الذكاء الاصطناعي الإكلينيكي ⚡' : 'Verified by Clinical Pharmacology AI Engine ⚡')
-                  : (language === 'ar' ? 'فحص إكلينيكي فوري بقواعد الأمان الدوائي المعتمدة' : 'Verified by Deterministic Clinical Rules')}
+                {language === 'ar' ? 'تم فحص التفاعلات وتوافق الجرعات وموانع الاستعمال الدوائية' : 'Screened for drug interactions and contraindications'}
               </span>
             </p>
           </div>
